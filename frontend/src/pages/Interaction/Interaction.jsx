@@ -17,7 +17,8 @@ import {
 } from "../../redux/slices/interactionSlice";
 import { fetchHCPs } from "../../redux/slices/hcpSlice";
 import { addNotification } from "../../redux/slices/uiSlice";
-import { askAI } from "../../services/interactionService";
+import { extractInteraction } from "../../services/interactionService";
+import { errorMessage } from "../../services/crmApi";
 import PageHeader from "../../components/common/PageHeader";
 import InteractionForm from "../../components/interaction/InteractionForm";
 import AISummaryCard from "../../components/interaction/AISummaryCard";
@@ -44,6 +45,8 @@ export default function Interaction() {
   const [searchHistory, setSearchHistory] = useState("");
   const [aiError, setAiError] = useState(null);
 
+  const capitalize = (v) => (v ? v.charAt(0).toUpperCase() + v.slice(1) : v);
+
   const handleGenerateAI = async () => {
     if (!draft.rawNotes?.trim()) {
       toast.error("Please enter interaction notes before generating AI summary.");
@@ -54,18 +57,35 @@ export default function Interaction() {
     dispatch(setCurrentAIResult(null));
     dispatch(setIsGeneratingAI(true));
 
-    const promptText = `Doctor Name: ${draft.doctorName || "Unknown"}
-Hospital: ${draft.hospital || "Unknown"}
-Products: ${(draft.products || []).join(", ")}
-Notes:
-${draft.rawNotes}`;
+    const selected = hcps.find((h) => h.name === draft.doctorName);
+    const promptText = selected
+      ? `Doctor: ${selected.name} (${selected.hospital})\n${draft.rawNotes}`
+      : draft.rawNotes;
 
     try {
-      const result = await askAI(promptText);
-      dispatch(setCurrentAIResult(result));
+      const { draft: ai, match, model, latencyMs, attempts } = await extractInteraction(promptText);
+      // The rep's own selections win; AI fills what they left empty.
+      dispatch(
+        setCurrentAIResult({
+          extracted: { hcpName: ai.hcpName, hospital: ai.hospital },
+          match,
+          model,
+          latencyMs,
+          attempts,
+          draft: {
+            hcpId: selected?.id ?? match.hcpId ?? "",
+            products: ai.products.length ? ai.products : draft.products || [],
+            sentiment: capitalize(ai.sentiment),
+            objectionsText: ai.objections.join("\n"),
+            followUpDate: draft.followUpDate || ai.followUpDate || "",
+            followUpAction: "",
+            summary: ai.summary,
+          },
+        })
+      );
     } catch (err) {
       console.error("AI request failed:", err);
-      setAiError(err?.response?.data?.detail || err?.message || "Request failed");
+      setAiError(errorMessage(err));
     } finally {
       dispatch(setIsGeneratingAI(false));
     }
@@ -75,30 +95,25 @@ ${draft.rawNotes}`;
 
   const handleSaveToCRM = async () => {
     if (isSaving) return;
-    if (!currentAIResult?.raw) {
-      toast.error("No AI result to save.");
+    const aiDraft = currentAIResult?.draft;
+    if (!aiDraft) {
+      toast.error("No AI draft to save.");
       return;
     }
-    // Unstructured replies are saved as the summary; nothing is invented for missing fields.
-    const structured = currentAIResult.structured || {};
-
-    const findHCP = (name) =>
-      name && hcps.find((h) => h.name.toLowerCase() === String(name).trim().toLowerCase());
-    const hcp = findHCP(draft.doctorName) || findHCP(structured["Doctor Name"]);
+    const hcp = hcps.find((h) => h.id === Number(aiDraft.hcpId));
     if (!hcp) {
-      toast.error("Select an HCP from the directory before saving this interaction.");
+      toast.error("Select the HCP for this interaction before saving.");
+      return;
+    }
+    if (!aiDraft.summary?.trim()) {
+      toast.error("Summary cannot be empty.");
       return;
     }
 
-    const doctorName = hcp.name;
-    const hospital = hcp.hospital;
-    const sentiment = structured["Sentiment"] || "Neutral";
-    const followUpAction = structured["Follow-up Action"] || "";
-    const extracted = structured["Products Discussed"];
-    const products = (Array.isArray(extracted) ? extracted : extracted ? [extracted] : draft.products || [])
-      .map((p) => String(p).trim())
+    const objections = (aiDraft.objectionsText || "")
+      .split("\n")
+      .map((o) => o.trim())
       .filter(Boolean);
-    const objections = structured["Objections"];
 
     setIsSaving(true);
     try {
@@ -106,15 +121,13 @@ ${draft.rawNotes}`;
         addInteraction({
           hcpId: hcp.id,
           channel: draft.visitType || "In-Person Detailing",
-          products,
+          products: aiDraft.products,
           notes: draft.rawNotes,
-          sentiment,
-          objections: objections
-            ? Array.isArray(objections) ? objections.join("; ") : String(objections)
-            : null,
-          followUpDate: draft.followUpDate || null,
-          summary: structured["Summary"] || currentAIResult.raw,
-          followUpAction: followUpAction || null,
+          sentiment: aiDraft.sentiment,
+          objections: objections.length ? objections.join("; ") : null,
+          followUpDate: aiDraft.followUpDate || null,
+          summary: aiDraft.summary.trim(),
+          followUpAction: aiDraft.followUpAction?.trim() || null,
         })
       ).unwrap();
     } catch (err) {
@@ -127,12 +140,13 @@ ${draft.rawNotes}`;
     // Server updated the HCP's last visit and interaction count.
     dispatch(fetchHCPs());
 
-    // Add stateful notification
     dispatch(
       addNotification({
-        title: `Detailing Logged: ${doctorName}`,
-        description: followUpAction || `Detailing session recorded at ${hospital} with ${sentiment} sentiment.`,
-        type: sentiment === "Positive" ? "success" : "ai",
+        title: `Detailing Logged: ${hcp.name}`,
+        description:
+          aiDraft.followUpAction ||
+          `Detailing session recorded at ${hcp.hospital} with ${aiDraft.sentiment} sentiment.`,
+        type: aiDraft.sentiment === "Positive" ? "success" : "ai",
       })
     );
 
@@ -232,6 +246,7 @@ ${draft.rawNotes}`;
           error={aiError}
           onRetry={handleGenerateAI}
           onSaveInteraction={handleSaveToCRM}
+          isSaving={isSaving}
         />
       </div>
 
@@ -261,7 +276,7 @@ ${draft.rawNotes}`;
                 <option value="All">All Sentiments</option>
                 <option value="Positive">Positive</option>
                 <option value="Neutral">Neutral</option>
-                <option value="Skeptical">Skeptical</option>
+                <option value="Negative">Negative</option>
               </select>
             </div>
           }

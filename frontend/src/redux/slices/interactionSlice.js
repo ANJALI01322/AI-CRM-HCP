@@ -39,6 +39,11 @@ export const interactionSlice = createSlice({
     setCurrentAIResult: (state, action) => {
       state.currentAIResult = action.payload;
     },
+    updateAIDraft: (state, action) => {
+      if (state.currentAIResult) {
+        state.currentAIResult.draft = { ...state.currentAIResult.draft, ...action.payload };
+      }
+    },
     clearCurrentAIResult: (state) => {
       state.currentAIResult = null;
     },
@@ -79,6 +84,7 @@ export const interactionSlice = createSlice({
 
 export const {
   setCurrentAIResult,
+  updateAIDraft,
   clearCurrentAIResult,
   setIsGeneratingAI,
   updateActiveDraft,

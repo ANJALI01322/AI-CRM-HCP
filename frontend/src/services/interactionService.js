@@ -55,6 +55,15 @@ export const askAI = async (notes) => {
 };
 
 /**
+ * LangGraph extraction: notes -> { draft, match, model, latencyMs, attempts }. Nothing is saved.
+ * Throws on failure; callers show the error, never invented output.
+ */
+export const extractInteraction = async (notes) => {
+  const { data } = await api.post("/interaction/ai/extract", { notes });
+  return data;
+};
+
+/**
  * Fetches dashboard KPI stats from backend
  */
 export const getDashboardStats = async () => {

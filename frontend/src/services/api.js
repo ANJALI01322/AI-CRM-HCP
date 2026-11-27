@@ -46,6 +46,8 @@ export const onUnauthorized = (handler) => {
 
 api.interceptors.request.use((config) => {
   if (authToken) config.headers.Authorization = `Bearer ${authToken}`;
+  // Lets the server compute "today" / "overdue" in the user's timezone.
+  config.headers["X-TZ-Offset"] = String(-new Date().getTimezoneOffset());
   return config;
 });
 

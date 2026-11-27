@@ -1,6 +1,7 @@
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
 
-from fastapi import Depends, HTTPException, Query
+from fastapi import Depends, Header, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -58,6 +59,13 @@ def require_manager(ctx: RequestContext = Depends(get_context)) -> RequestContex
     if not ctx.is_manager:
         raise HTTPException(status_code=403, detail="Manager role required")
     return ctx
+
+
+def local_today(
+    x_tz_offset: int | None = Header(None, ge=-840, le=840, description="Client UTC offset in minutes (IST = 330)"),
+) -> date:
+    """'Today' in the caller's timezone, so due/overdue/today counts match what the user sees."""
+    return (datetime.now(timezone.utc) + timedelta(minutes=x_tz_offset or 0)).date()
 
 
 @dataclass(frozen=True)

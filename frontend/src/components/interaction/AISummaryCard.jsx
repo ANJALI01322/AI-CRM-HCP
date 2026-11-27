@@ -1,18 +1,23 @@
-import React from "react";
+import React, { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   Sparkles,
   CheckCircle2,
   Save,
   Copy,
-  Activity,
-  FileCheck,
-  Building,
   AlertTriangle,
   RotateCcw,
+  X,
 } from "lucide-react";
 import Badge from "../common/Badge";
 import Button from "../common/Button";
+import { updateAIDraft } from "../../redux/slices/interactionSlice";
 import toast from "react-hot-toast";
+
+const fieldClass =
+  "w-full text-xs sm:text-sm px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 shadow-2xs";
+const labelClass =
+  "block text-xs font-mono font-bold uppercase tracking-wider text-slate-500 mb-1.5";
 
 export default function AISummaryCard({
   aiResult,
@@ -20,20 +25,38 @@ export default function AISummaryCard({
   error,
   onRetry,
   onSaveInteraction,
+  isSaving,
 }) {
-  const structured = aiResult?.structured;
-  const raw = aiResult?.raw;
-  const hasResult = Boolean(structured || raw);
+  const dispatch = useDispatch();
+  const hcps = useSelector((state) => state.hcp.items);
+  const [newProduct, setNewProduct] = useState("");
+
+  const d = aiResult?.draft;
+  const hasResult = Boolean(d);
+  const set = (fields) => dispatch(updateAIDraft(fields));
+  const candidates = aiResult?.match?.candidates || [];
+  const candidateIds = new Set(candidates.map((c) => c.id));
+  const selectedHCP = hcps.find((h) => h.id === Number(d?.hcpId));
+
+  const addProduct = () => {
+    const name = newProduct.trim();
+    if (name && !d.products.some((p) => p.toLowerCase() === name.toLowerCase())) {
+      set({ products: [...d.products, name] });
+    }
+    setNewProduct("");
+  };
 
   const handleCopySummary = () => {
     if (!hasResult) return;
-    const text = structured
-      ? `HCP: ${structured["Doctor Name"] || ""}\nHospital: ${
-          structured["Hospital"] || ""
-        }\nSummary: ${structured["Summary"] || ""}\nSentiment: ${
-          structured["Sentiment"] || ""
-        }\nFollow-up: ${structured["Follow-up Action"] || ""}`
-      : raw;
+    const text = [
+      `HCP: ${selectedHCP?.name || ""}`,
+      `Hospital: ${selectedHCP?.hospital || ""}`,
+      `Summary: ${d.summary || ""}`,
+      `Sentiment: ${d.sentiment || ""}`,
+      `Products: ${d.products.join(", ")}`,
+      `Objections: ${d.objectionsText || ""}`,
+      `Follow-up: ${d.followUpDate || ""} ${d.followUpAction || ""}`.trim(),
+    ].join("\n");
     navigator.clipboard.writeText(text);
     toast.success("AI Summary copied to clipboard!");
   };
@@ -64,8 +87,11 @@ export default function AISummaryCard({
             >
               <Copy className="w-4 h-4" />
             </button>
-            <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-md bg-teal-50 text-teal-700 border border-teal-200">
-              LangGraph Verified
+            <span
+              className="text-xs font-mono font-semibold px-2.5 py-1 rounded-md bg-teal-50 text-teal-700 border border-teal-200"
+              title={`Model: ${aiResult.model} • Attempts: ${aiResult.attempts}`}
+            >
+              {aiResult.model} • {(aiResult.latencyMs / 1000).toFixed(1)}s
             </span>
           </div>
         )}
@@ -82,7 +108,7 @@ export default function AISummaryCard({
                 LangGraph Agent Reasoning...
               </p>
               <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto leading-relaxed">
-                Extracting clinical entities, sentiment alignment, and optimal next follow-up action.
+                Extracting clinical entities, sentiment, objections and follow-up date, then matching the HCP.
               </p>
             </div>
           </div>
@@ -93,7 +119,7 @@ export default function AISummaryCard({
           >
             <AlertTriangle className="w-8 h-8 text-rose-500 mx-auto" />
             <h4 className="text-sm font-bold text-rose-800">
-              AI service unavailable
+              AI extraction failed
             </h4>
             <p className="text-xs text-rose-700 max-w-xs mx-auto leading-relaxed wrap-break-word">
               {error}
@@ -110,90 +136,152 @@ export default function AISummaryCard({
               </Button>
             )}
           </div>
-        ) : structured ? (
+        ) : hasResult ? (
           <div className="space-y-4 animate-fade-in">
-            {/* Extracted Doctor & Sentiment Row */}
-            <div className="flex items-center justify-between p-4 bg-slate-50/80 rounded-xl border border-slate-200/80">
-              <div className="min-w-0">
-                <p className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500">
-                  Target HCP & Hospital
-                </p>
-                <h4 className="text-sm sm:text-base font-bold text-slate-900 truncate mt-0.5">
-                  {structured["Doctor Name"] || "Not identified"}
-                </h4>
-                <p className="text-xs text-slate-600 truncate mt-0.5 font-medium">
-                  {structured["Hospital"] || "Not identified"}
-                </p>
-              </div>
+            <p className="text-xs text-slate-500">
+              AI draft — review and edit before saving. Nothing is stored until you confirm.
+            </p>
 
-              {structured["Sentiment"] && (
-                <div className="text-right shrink-0">
-                  <p className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500 mb-1">
-                    Sentiment
+            {/* HCP & Sentiment */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-2">
+                <label className={labelClass}>Healthcare Professional</label>
+                <select
+                  value={d.hcpId || ""}
+                  onChange={(e) => set({ hcpId: e.target.value ? Number(e.target.value) : "" })}
+                  className={fieldClass}
+                >
+                  <option value="">-- Select HCP --</option>
+                  {candidates.length > 0 && (
+                    <optgroup label="AI suggestions">
+                      {candidates.map((c) => (
+                        <option key={`c-${c.id}`} value={c.id}>
+                          {c.name} ({c.hospital}) — {Math.round(c.score * 100)}% match
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <optgroup label="All HCPs">
+                    {hcps
+                      .filter((h) => !candidateIds.has(h.id))
+                      .map((h) => (
+                        <option key={h.id} value={h.id}>
+                          {h.name} ({h.hospital})
+                        </option>
+                      ))}
+                  </optgroup>
+                </select>
+                {!d.hcpId && (
+                  <p className="text-xs text-amber-700 mt-1 font-medium">
+                    {aiResult.extracted?.hcpName
+                      ? `AI read "${aiResult.extracted.hcpName}" but couldn't match it confidently. Pick the HCP.`
+                      : "No doctor named in the notes. Pick the HCP."}
                   </p>
-                  <Badge variant={structured["Sentiment"]} size="md" dot>
-                    {structured["Sentiment"]}
+                )}
+              </div>
+              <div>
+                <label className={labelClass}>Sentiment</label>
+                <select
+                  value={d.sentiment}
+                  onChange={(e) => set({ sentiment: e.target.value })}
+                  className={fieldClass}
+                >
+                  <option value="Positive">Positive</option>
+                  <option value="Neutral">Neutral</option>
+                  <option value="Negative">Negative</option>
+                </select>
+                <div className="mt-1.5">
+                  <Badge variant={d.sentiment} size="xs" dot>
+                    {d.sentiment}
                   </Badge>
                 </div>
-              )}
+              </div>
             </div>
 
-            {/* Key Summary */}
-            <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-1.5">
-              <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500">
-                Executive Detailing Summary
+            {/* Summary */}
+            <div>
+              <label className={labelClass}>Executive Detailing Summary</label>
+              <textarea
+                rows="3"
+                value={d.summary}
+                onChange={(e) => set({ summary: e.target.value })}
+                className={`${fieldClass} leading-relaxed`}
+              />
+            </div>
+
+            {/* Products */}
+            <div>
+              <label className={labelClass}>Products Discussed</label>
+              <div className="flex flex-wrap gap-1.5">
+                {d.products.map((p) => (
+                  <span
+                    key={p}
+                    className="text-xs pl-2.5 pr-1 py-1 rounded-lg bg-white text-slate-800 font-semibold border border-slate-200 shadow-2xs flex items-center gap-1"
+                  >
+                    {p}
+                    <button
+                      type="button"
+                      onClick={() => set({ products: d.products.filter((x) => x !== p) })}
+                      className="p-0.5 rounded text-slate-400 hover:text-rose-600 cursor-pointer"
+                      aria-label={`Remove ${p}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  type="text"
+                  value={newProduct}
+                  onChange={(e) => setNewProduct(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addProduct();
+                    }
+                  }}
+                  onBlur={addProduct}
+                  placeholder="+ Add product"
+                  className="text-xs px-2.5 py-1 rounded-lg border border-dashed border-slate-300 bg-white w-32 focus:outline-none focus:border-teal-500"
+                />
+              </div>
+            </div>
+
+            {/* Objections */}
+            <div>
+              <label className={labelClass}>Objections (one per line)</label>
+              <textarea
+                rows="2"
+                value={d.objectionsText}
+                onChange={(e) => set({ objectionsText: e.target.value })}
+                placeholder="None recorded"
+                className={`${fieldClass} leading-relaxed placeholder:text-slate-400`}
+              />
+            </div>
+
+            {/* Follow-up */}
+            <div className="p-4 bg-teal-50/80 rounded-xl border border-teal-200/90 space-y-3 shadow-2xs">
+              <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-teal-800 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
+                Follow-up
               </h5>
-              <p className="text-slate-800 leading-relaxed text-xs sm:text-sm">
-                {structured["Summary"]}
-              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input
+                  type="date"
+                  value={d.followUpDate || ""}
+                  onChange={(e) => set({ followUpDate: e.target.value })}
+                  className={fieldClass}
+                  aria-label="Follow-up date"
+                />
+                <input
+                  type="text"
+                  value={d.followUpAction}
+                  onChange={(e) => set({ followUpAction: e.target.value })}
+                  placeholder="Action (optional)"
+                  className={`${fieldClass} sm:col-span-2 placeholder:text-slate-400`}
+                  aria-label="Follow-up action"
+                />
+              </div>
             </div>
-
-            {/* Follow-up Action */}
-            {structured["Follow-up Action"] && (
-              <div className="p-4 bg-teal-50/80 rounded-xl border border-teal-200/90 space-y-1.5 shadow-2xs">
-                <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-teal-800 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
-                  Recommended Commercial Action
-                </h5>
-                <p className="text-teal-950 font-semibold leading-relaxed text-xs sm:text-sm">
-                  {structured["Follow-up Action"]}
-                </p>
-              </div>
-            )}
-
-            {/* Products Discussed Pills */}
-            {structured["Products Discussed"] && (
-              <div>
-                <p className="text-xs font-mono font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Products Extracted
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {Array.isArray(structured["Products Discussed"]) ? (
-                    structured["Products Discussed"].map((p, i) => (
-                      <span
-                        key={i}
-                        className="text-xs px-2.5 py-1 rounded-lg bg-white text-slate-800 font-semibold border border-slate-200 shadow-2xs"
-                      >
-                        {p}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-xs px-2.5 py-1 rounded-lg bg-white text-slate-800 font-semibold border border-slate-200 shadow-2xs">
-                      {structured["Products Discussed"]}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : raw ? (
-          <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-1.5 animate-fade-in">
-            <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500">
-              AI Response (unstructured)
-            </h5>
-            <p className="text-slate-800 leading-relaxed text-xs sm:text-sm whitespace-pre-wrap wrap-break-word">
-              {raw}
-            </p>
           </div>
         ) : (
           <div className="py-14 text-center space-y-2 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 p-6">
@@ -202,12 +290,12 @@ export default function AISummaryCard({
               AI Intelligence Layer Ready
             </h4>
             <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
-              Enter detailing notes on the left or select a rapid scenario template, then click <strong>"Extract Clinical Intelligence"</strong>.
+              Enter detailing notes on the left, then click <strong>"Extract Clinical Intelligence"</strong>. You can review and edit the draft before saving.
             </p>
           </div>
         )}
 
-        {/* Save to CRM History Button */}
+        {/* Confirm & save */}
         {hasResult && !isLoading && !error && (
           <div className="pt-2 border-t border-slate-100">
             <Button
@@ -215,9 +303,11 @@ export default function AISummaryCard({
               size="lg"
               icon={Save}
               onClick={onSaveInteraction}
+              isLoading={isSaving}
+              disabled={!d.hcpId || isSaving}
               className="w-full text-xs sm:text-sm font-bold shadow-xs cursor-pointer"
             >
-              Commit to CRM & Update Territory Timeline
+              Confirm & Save to CRM
             </Button>
           </div>
         )}
