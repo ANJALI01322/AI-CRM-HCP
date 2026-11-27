@@ -1,10 +1,11 @@
 from datetime import date, datetime
 
 from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.database import Base
 from app.models.base import OrgScopedMixin
+from app.models.hcp import HCP
 
 
 class FollowUp(OrgScopedMixin, Base):
@@ -27,3 +28,13 @@ class FollowUp(OrgScopedMixin, Base):
     action: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="open")
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    hcp: Mapped[HCP] = relationship(lazy="raise")
+
+    @property
+    def hcp_name(self) -> str:
+        return self.hcp.name
+
+    @property
+    def hcp_hospital(self) -> str:
+        return self.hcp.hospital

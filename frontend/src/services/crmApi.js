@@ -101,3 +101,26 @@ export const listFollowUps = async (status) => {
 };
 
 export const updateFollowUp = async (id, patch) => (await api.patch(`/follow-ups/${id}`, patch)).data;
+
+// ---- Search, team, export ----
+
+export const searchHCPs = async (q, signal) =>
+  (await api.get("/hcps", { params: { q, limit: 6 }, signal })).data.items;
+
+export const getTeamActivity = async () => (await api.get("/team/activity")).data;
+
+/** Downloads a server-generated CSV (scoped to the signed-in user's role). */
+export const downloadCsv = async (path) => {
+  const res = await api.get(path, { responseType: "blob" });
+  const filename =
+    /filename="([^"]+)"/.exec(res.headers["content-disposition"] || "")?.[1] || "export.csv";
+  const url = URL.createObjectURL(res.data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  return filename;
+};

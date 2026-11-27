@@ -205,7 +205,7 @@ export default function Chat() {
       </div>
 
       {/* Main Analyst Workspace Container */}
-      <div className="h-[640px] flex flex-col bg-white rounded-2xl border border-slate-200/90 card-shadow overflow-hidden text-sm">
+      <div className="h-[min(640px,calc(100vh-17rem))] min-h-[440px] flex flex-col bg-white rounded-2xl border border-slate-200/90 card-shadow overflow-hidden text-sm">
         {/* Messages Stream */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 custom-scrollbar bg-slate-50/50">
           {messages.map((msg) => (

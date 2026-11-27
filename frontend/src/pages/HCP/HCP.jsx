@@ -36,6 +36,7 @@ import HCPDetailDrawer from "../../components/hcp/HCPDetailDrawer";
 import AddHCPModal from "../../components/hcp/AddHCPModal";
 import EditHCPModal from "../../components/hcp/EditHCPModal";
 import { SPECIALTIES } from "../../constants/options";
+import { downloadCsv } from "../../services/crmApi";
 import toast from "react-hot-toast";
 
 export default function HCP() {
@@ -138,23 +139,13 @@ export default function HCP() {
     }
   };
 
-  const handleExportCSV = () => {
-    const headers = "Name,Qualification,Specialty,Hospital,City,Tier,Priority,Status,LastVisit\n";
-    const rows = filteredHCPs
-      .map(
-        (d) =>
-          `"${d.name}","${d.qualification}","${d.specialty}","${d.hospital}","${d.city}","${d.tier}","${d.priority}","${d.status}","${d.lastVisit || ""}"`
-      )
-      .join("\n");
-    const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `HCP_Directory_${new Date().toISOString().split("T")[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("HCP Directory exported to CSV!");
+  const handleExportCSV = async () => {
+    try {
+      const filename = await downloadCsv("/export/hcps.csv");
+      toast.success(`Exported ${filename}`);
+    } catch (err) {
+      toast.error(`Export failed: ${err?.message || "Request failed"}`);
+    }
   };
 
   const hasActiveFilters =

@@ -25,6 +25,7 @@ import EmptyState from "../../components/common/EmptyState";
 import { Skeleton } from "../../components/common/Skeleton";
 import ClinicalSignalCard from "../../components/common/ClinicalSignalCard";
 import RecentActivity from "../../components/dashboard/RecentActivity";
+import TeamActivity from "../../components/dashboard/TeamActivity";
 import { dueLabel, pluralize, shortDate } from "../../utils/format";
 import toast from "react-hot-toast";
 
@@ -453,6 +454,8 @@ export default function Dashboard() {
 
         <RecentActivity onViewDetails={(item) => setSelectedActivity(item)} />
       </div>
+
+      {isManager && <TeamActivity />}
 
       {/* CHANNEL SPLIT */}
       <div className="bg-white rounded-2xl border border-slate-200/90 card-shadow p-5 sm:p-6 space-y-4">

@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.crud import check_org_user, count, get_owned, scope, update_fields
@@ -48,12 +48,18 @@ def _out(db: Session, ctx: RequestContext, clock: Clock, hcps: list[HCP]) -> lis
 
 @router.get("", response_model=Page[HCPOut])
 def list_hcps(
+    q: str | None = Query(None, max_length=100, description="Match name, hospital, specialty or city"),
     page: Pagination = Depends(pagination),
     ctx: RequestContext = Depends(get_context),
     db: Session = Depends(db_session),
     clock: Clock = Depends(client_clock),
 ):
     query = select(HCP).where(*scope(HCP, ctx)).order_by(HCP.name, HCP.id)
+    if q and q.strip():
+        term = q.strip()
+        query = query.where(
+            or_(*(col.icontains(term, autoescape=True) for col in (HCP.name, HCP.hospital, HCP.specialty, HCP.city)))
+        )
     hcps = db.scalars(query.limit(page.limit).offset(page.offset)).all()
     return Page(
         items=_out(db, ctx, clock, hcps),

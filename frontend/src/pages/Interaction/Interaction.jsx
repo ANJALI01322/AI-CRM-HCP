@@ -7,6 +7,7 @@ import {
   Building,
   Calendar,
   Trash2,
+  Download,
 } from "lucide-react";
 import {
   addInteraction,
@@ -18,7 +19,7 @@ import {
 import { fetchHCPs } from "../../redux/slices/hcpSlice";
 import { addNotification } from "../../redux/slices/uiSlice";
 import { extractInteraction } from "../../services/interactionService";
-import { errorMessage } from "../../services/crmApi";
+import { downloadCsv, errorMessage } from "../../services/crmApi";
 import PageHeader from "../../components/common/PageHeader";
 import InteractionForm from "../../components/interaction/InteractionForm";
 import AISummaryCard from "../../components/interaction/AISummaryCard";
@@ -255,6 +256,21 @@ export default function Interaction() {
         <CardHeader
           action={
             <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const filename = await downloadCsv("/export/interactions.csv");
+                    toast.success(`Exported ${filename}`);
+                  } catch (err) {
+                    toast.error(`Export failed: ${err?.message || "Request failed"}`);
+                  }
+                }}
+                className="text-xs sm:text-sm px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-700 shadow-2xs hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" /> Export CSV
+              </button>
+
               {/* Search input */}
               <div className="relative">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />

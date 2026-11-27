@@ -15,6 +15,7 @@ import {
   Radio,
   X,
   LogOut,
+  CalendarClock,
 } from "lucide-react";
 import {
   toggleSidebarCollapse,
@@ -42,6 +43,12 @@ const navigationGroups = [
         path: "/hcp",
         icon: Users,
         badgeKey: "hcpsCount",
+      },
+      {
+        name: "Follow-ups",
+        path: "/follow-ups",
+        icon: CalendarClock,
+        badgeKey: "followUpsDue",
       },
       {
         name: "Detailing Logger",
@@ -144,6 +151,12 @@ export default function Sidebar() {
 
                         {!isSidebarCollapsed && (
                           <span className="truncate flex-1">{item.name}</span>
+                        )}
+
+                        {!isSidebarCollapsed && item.badgeKey === "followUpsDue" && stats && stats.followUps.dueNow > 0 && (
+                          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-rose-950/80 text-rose-300 border border-rose-900/80">
+                            {stats.followUps.dueNow}
+                          </span>
                         )}
 
                         {!isSidebarCollapsed && item.badgeKey === "hcpsCount" && (

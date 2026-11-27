@@ -13,6 +13,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { setSelectedHCP } from "../../redux/slices/hcpSlice";
+import { errorMessage, searchHCPs } from "../../services/crmApi";
 import HCPAvatar from "./HCPAvatar";
 
 export default function CommandPalette({ isOpen, onClose }) {
@@ -23,20 +24,36 @@ export default function CommandPalette({ isOpen, onClose }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef(null);
 
-  const hcps = useSelector((state) => state.hcp.items);
   const catalog = useSelector((state) => state.catalog.products);
 
-  // Filter items
-  const matchedHCPs = query.trim()
-    ? hcps
-        .filter(
-          (h) =>
-            h.name.toLowerCase().includes(query.toLowerCase()) ||
-            h.specialty.toLowerCase().includes(query.toLowerCase()) ||
-            h.hospital.toLowerCase().includes(query.toLowerCase())
-        )
-        .slice(0, 4)
-    : hcps.slice(0, 4);
+  // HCPs come from the API (scoped to the signed-in user), debounced while typing.
+  const [matchedHCPs, setMatchedHCPs] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const controller = new AbortController();
+    const term = query.trim();
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      setSearchError(null);
+      try {
+        setMatchedHCPs(await searchHCPs(term, controller.signal));
+      } catch (err) {
+        if (err?.code !== "ERR_CANCELED") {
+          setMatchedHCPs([]);
+          setSearchError(errorMessage(err));
+        }
+      } finally {
+        if (!controller.signal.aborted) setSearching(false);
+      }
+    }, term ? 250 : 0);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [isOpen, query]);
 
   const matchedProducts = catalog.filter(
     (p) =>
@@ -94,10 +111,6 @@ export default function CommandPalette({ isOpen, onClose }) {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
-        e.preventDefault();
-        if (isOpen) onClose();
-      }
       if (e.key === "Escape" && isOpen) {
         onClose();
       }
@@ -208,6 +221,17 @@ export default function CommandPalette({ isOpen, onClose }) {
                 Healthcare Professionals
               </div>
               <div className="space-y-1">
+                {matchedHCPs.length === 0 && (
+                  <p className="px-3 py-2 text-xs text-slate-400" role={searchError ? "alert" : undefined}>
+                    {searchError
+                      ? `Search failed: ${searchError}`
+                      : searching
+                      ? "Searching…"
+                      : query.trim()
+                      ? "No matching healthcare professionals."
+                      : "No healthcare professionals yet."}
+                  </p>
+                )}
                 {matchedHCPs.map((doc, docIdx) => {
                   const itemIndex = actions.length + docIdx;
                   const isSelected = selectedIndex === itemIndex;

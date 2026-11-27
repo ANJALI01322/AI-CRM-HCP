@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.crud import count, get_owned, scope, update_fields
 from app.api.deps import Pagination, RequestContext, db_session, get_context, pagination
@@ -13,6 +13,16 @@ from app.schemas.follow_up import FollowUpCreate, FollowUpOut, FollowUpStatus, F
 router = APIRouter(prefix="/follow-ups", tags=["Follow-ups"])
 
 REQUIRED = {"due_date", "action", "status"}
+
+
+def _load(db: Session, follow_up_id: int, ctx: RequestContext) -> FollowUp:
+    get_owned(db, FollowUp, follow_up_id, ctx, "Follow-up")
+    return db.scalar(
+        select(FollowUp)
+        .options(joinedload(FollowUp.hcp))
+        .where(FollowUp.id == follow_up_id)
+        .execution_options(populate_existing=True)
+    )
 
 
 def _sync_completed_at(follow_up: FollowUp) -> None:
@@ -36,13 +46,13 @@ def list_follow_ups(
     if status is not None:
         query = query.where(FollowUp.status == status)
     query = query.order_by(FollowUp.due_date, FollowUp.id)
-    items = db.scalars(query.limit(page.limit).offset(page.offset)).all()
+    items = db.scalars(query.options(joinedload(FollowUp.hcp)).limit(page.limit).offset(page.offset)).all()
     return Page(items=items, total=count(db, query), limit=page.limit, offset=page.offset)
 
 
 @router.get("/{follow_up_id}", response_model=FollowUpOut)
 def get_follow_up(follow_up_id: int, ctx: RequestContext = Depends(get_context), db: Session = Depends(db_session)):
-    return get_owned(db, FollowUp, follow_up_id, ctx, "Follow-up")
+    return _load(db, follow_up_id, ctx)
 
 
 @router.post("", response_model=FollowUpOut, status_code=201)
@@ -56,8 +66,7 @@ def create_follow_up(
     _sync_completed_at(follow_up)
     db.add(follow_up)
     db.commit()
-    db.refresh(follow_up)
-    return follow_up
+    return _load(db, follow_up.id, ctx)
 
 
 @router.patch("/{follow_up_id}", response_model=FollowUpOut)
@@ -71,8 +80,7 @@ def update_follow_up(
     update_fields(follow_up, payload, REQUIRED)
     _sync_completed_at(follow_up)
     db.commit()
-    db.refresh(follow_up)
-    return follow_up
+    return _load(db, follow_up_id, ctx)
 
 
 @router.delete("/{follow_up_id}", status_code=204)

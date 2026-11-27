@@ -56,6 +56,18 @@ export default function Navbar() {
   const notifications = [...followUpAlerts, ...sessionNotifications];
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
 
+  // Cmd/Ctrl+K toggles the command palette from anywhere.
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsCommandOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   // Click outside to close notification panel
   useEffect(() => {
     const handleClickOutside = (event) => {

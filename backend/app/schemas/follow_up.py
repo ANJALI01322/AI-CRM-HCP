@@ -24,6 +24,8 @@ class FollowUpUpdate(CamelModel):
 
 class FollowUpOut(FollowUpCreate):
     id: int
+    hcp_name: str
+    hcp_hospital: str
     user_id: int | None
     completed_at: datetime | None
     created_at: datetime
