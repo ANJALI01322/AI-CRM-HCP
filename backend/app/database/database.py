@@ -25,7 +25,9 @@ def get_engine() -> Engine:
     """Create the engine on first use so a missing DATABASE_URL never breaks app import."""
     if not config.DATABASE_URL:
         raise DatabaseNotConfigured("DATABASE_URL is not set")
-    return create_engine(normalize_url(config.DATABASE_URL), pool_pre_ping=True)
+    return create_engine(
+        normalize_url(config.DATABASE_URL), pool_pre_ping=True, pool_recycle=300, pool_size=5, max_overflow=5
+    )
 
 
 @lru_cache(maxsize=1)
