@@ -34,6 +34,8 @@ def verify_password(password: str, password_hash: str | None) -> bool:
 def _secret() -> str:
     if not config.JWT_SECRET:
         raise AuthNotConfigured("JWT_SECRET is not set")
+    if len(config.JWT_SECRET) < config.JWT_MIN_SECRET_LENGTH:
+        raise AuthNotConfigured(f"JWT_SECRET must be at least {config.JWT_MIN_SECRET_LENGTH} characters")
     return config.JWT_SECRET
 
 

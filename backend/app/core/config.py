@@ -25,6 +25,9 @@ DEMO_ORG_SLUG = _clean(os.getenv("DEMO_ORG_SLUG")) or "demo"
 # Required for login. Use a long random value (e.g. `python -c "import secrets; print(secrets.token_urlsafe(48))"`).
 JWT_SECRET = _clean(os.getenv("JWT_SECRET"))
 JWT_EXPIRE_HOURS = 24
+JWT_MIN_SECRET_LENGTH = 32
+
+LOG_LEVEL = (_clean(os.getenv("LOG_LEVEL")) or "INFO").upper()
 
 ALLOWED_ORIGINS = [
     origin.strip().rstrip("/")

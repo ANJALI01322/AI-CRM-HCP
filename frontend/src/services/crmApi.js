@@ -1,13 +1,17 @@
 import api from "./api";
 
-const PAGE_SIZE = 200; // backend maximum
+const PAGE_SIZE = 100; // backend maximum
 
+/** Readable text from the API's {error, message, requestId} body, with a plain fallback. */
 export const errorMessage = (err) => {
-  const detail = err?.response?.data?.detail;
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail) && detail[0]?.msg) {
-    const field = detail[0].loc?.slice(-1)[0];
-    return field ? `${field}: ${detail[0].msg}` : detail[0].msg;
+  const data = err?.response?.data;
+  if (typeof data?.message === "string" && data.message) {
+    return err.response.status >= 500 && data.requestId
+      ? `${data.message} (ref ${data.requestId.slice(0, 8)})`
+      : data.message;
+  }
+  if (!err?.response && err?.message === "Network Error") {
+    return "Cannot reach the server. Check your connection and try again.";
   }
   return err?.message || "Request failed";
 };

@@ -5,7 +5,7 @@ from pydantic.alias_generators import to_camel
 
 T = TypeVar("T")
 
-MAX_PAGE_SIZE = 200
+MAX_PAGE_SIZE = 100
 
 
 class CamelModel(BaseModel):

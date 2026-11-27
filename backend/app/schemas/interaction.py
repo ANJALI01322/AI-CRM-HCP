@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import Field
 
@@ -6,8 +7,11 @@ from app.schemas.common import CamelModel
 from app.schemas.hcp import ProductName
 
 
+Sentiment = Literal["Positive", "Neutral", "Negative"]
+
+
 class InteractionFields(CamelModel):
-    sentiment: str | None = Field(None, max_length=32)
+    sentiment: Sentiment | None = None
     objections: str | None = Field(None, max_length=5000)
     follow_up_date: date | None = None
     summary: str | None = Field(None, max_length=10000)
