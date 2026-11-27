@@ -1,26 +1,16 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { INITIAL_HCPS } from "../../constants/mockData";
+import * as crmApi from "../../services/crmApi";
+import { apiThunk } from "../apiThunk";
 
-const loadHCPsFromStorage = () => {
-  try {
-    const saved = localStorage.getItem("omni_crm_hcps");
-    if (saved) return JSON.parse(saved);
-  } catch (e) {
-    console.warn("Could not load HCPs from localStorage", e);
-  }
-  return INITIAL_HCPS;
-};
-
-const saveHCPsToStorage = (hcps) => {
-  try {
-    localStorage.setItem("omni_crm_hcps", JSON.stringify(hcps));
-  } catch (e) {
-    console.warn("Could not save HCPs to localStorage", e);
-  }
-};
+export const fetchHCPs = apiThunk("hcp/fetchAll", () => crmApi.listHCPs());
+export const addHCP = apiThunk("hcp/add", (hcp) => crmApi.createHCP(hcp));
+export const updateHCP = apiThunk("hcp/update", (hcp) => crmApi.updateHCP(hcp));
+export const deleteHCP = apiThunk("hcp/delete", (id) => crmApi.deleteHCP(id));
 
 const initialState = {
-  items: loadHCPsFromStorage(),
+  items: [],
+  status: "idle", // 'idle' | 'loading' | 'succeeded' | 'failed'
+  error: null,
   selectedHCP: null,
   searchQuery: "",
   filterSpecialty: "All",
@@ -37,35 +27,6 @@ export const hcpSlice = createSlice({
   name: "hcp",
   initialState,
   reducers: {
-    addHCP: (state, action) => {
-      const newHCP = {
-        id: `hcp-${Date.now()}`,
-        interactionCount: 0,
-        lastVisit: "Never",
-        status: "Active",
-        avatar: `https://images.unsplash.com/photo-${1530000000000 + Math.floor(Math.random() * 90000000)}?w=150&auto=format&fit=crop&q=80`,
-        ...action.payload,
-      };
-      state.items.unshift(newHCP);
-      saveHCPsToStorage(state.items);
-    },
-    updateHCP: (state, action) => {
-      const index = state.items.findIndex((item) => item.id === action.payload.id);
-      if (index !== -1) {
-        state.items[index] = { ...state.items[index], ...action.payload };
-        if (state.selectedHCP?.id === action.payload.id) {
-          state.selectedHCP = state.items[index];
-        }
-        saveHCPsToStorage(state.items);
-      }
-    },
-    deleteHCP: (state, action) => {
-      state.items = state.items.filter((item) => item.id !== action.payload);
-      if (state.selectedHCP?.id === action.payload) {
-        state.selectedHCP = null;
-      }
-      saveHCPsToStorage(state.items);
-    },
     setSelectedHCP: (state, action) => {
       state.selectedHCP = action.payload;
     },
@@ -108,12 +69,44 @@ export const hcpSlice = createSlice({
       state.page = 1;
     },
   },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchHCPs.pending, (state) => {
+        state.status = "loading";
+        state.error = null;
+      })
+      .addCase(fetchHCPs.fulfilled, (state, action) => {
+        state.status = "succeeded";
+        state.items = action.payload;
+        if (state.selectedHCP) {
+          state.selectedHCP =
+            action.payload.find((h) => h.id === state.selectedHCP.id) || null;
+        }
+      })
+      .addCase(fetchHCPs.rejected, (state, action) => {
+        state.status = "failed";
+        state.error = action.payload || action.error.message;
+      })
+      .addCase(addHCP.fulfilled, (state, action) => {
+        state.items.unshift(action.payload);
+      })
+      .addCase(updateHCP.fulfilled, (state, action) => {
+        const index = state.items.findIndex((item) => item.id === action.payload.id);
+        if (index !== -1) state.items[index] = action.payload;
+        if (state.selectedHCP?.id === action.payload.id) {
+          state.selectedHCP = action.payload;
+        }
+      })
+      .addCase(deleteHCP.fulfilled, (state, action) => {
+        state.items = state.items.filter((item) => item.id !== action.payload);
+        if (state.selectedHCP?.id === action.payload) {
+          state.selectedHCP = null;
+        }
+      });
+  },
 });
 
 export const {
-  addHCP,
-  updateHCP,
-  deleteHCP,
   setSelectedHCP,
   setSearchQuery,
   setFilterSpecialty,

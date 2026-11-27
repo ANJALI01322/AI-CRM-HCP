@@ -13,8 +13,9 @@ import {
   deleteInteraction,
   setCurrentAIResult,
   setIsGeneratingAI,
+  fetchInteractions,
 } from "../../redux/slices/interactionSlice";
-import { updateHCP } from "../../redux/slices/hcpSlice";
+import { fetchHCPs } from "../../redux/slices/hcpSlice";
 import { addNotification } from "../../redux/slices/uiSlice";
 import { askAI } from "../../services/interactionService";
 import PageHeader from "../../components/common/PageHeader";
@@ -35,6 +36,8 @@ export default function Interaction() {
     (state) => state.interaction.isGeneratingAI
   );
   const interactions = useSelector((state) => state.interaction.items);
+  const interactionsStatus = useSelector((state) => state.interaction.status);
+  const interactionsError = useSelector((state) => state.interaction.error);
   const hcps = useSelector((state) => state.hcp.items);
 
   const [filterSentiment, setFilterSentiment] = useState("All");
@@ -68,7 +71,10 @@ ${draft.rawNotes}`;
     }
   };
 
-  const handleSaveToCRM = () => {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveToCRM = async () => {
+    if (isSaving) return;
     if (!currentAIResult?.raw) {
       toast.error("No AI result to save.");
       return;
@@ -76,49 +82,50 @@ ${draft.rawNotes}`;
     // Unstructured replies are saved as the summary; nothing is invented for missing fields.
     const structured = currentAIResult.structured || {};
 
-    const doctorName =
-      structured["Doctor Name"] || draft.doctorName || "Unknown HCP";
-    const hospital =
-      structured["Hospital"] || draft.hospital || "Not specified";
+    const findHCP = (name) =>
+      name && hcps.find((h) => h.name.toLowerCase() === String(name).trim().toLowerCase());
+    const hcp = findHCP(draft.doctorName) || findHCP(structured["Doctor Name"]);
+    if (!hcp) {
+      toast.error("Select an HCP from the directory before saving this interaction.");
+      return;
+    }
+
+    const doctorName = hcp.name;
+    const hospital = hcp.hospital;
     const sentiment = structured["Sentiment"] || "Neutral";
     const followUpAction = structured["Follow-up Action"] || "";
+    const extracted = structured["Products Discussed"];
+    const products = (Array.isArray(extracted) ? extracted : extracted ? [extracted] : draft.products || [])
+      .map((p) => String(p).trim())
+      .filter(Boolean);
+    const objections = structured["Objections"];
 
-    const newRecord = {
-      doctorName,
-      hospital,
-      specialty: draft.specialty || "Cardiology",
-      visitType: draft.visitType || "In-Person Detailing",
-      products: Array.isArray(structured["Products Discussed"])
-        ? structured["Products Discussed"]
-        : draft.products,
-      rawNotes: draft.rawNotes,
-      aiSummary: {
-        doctorName,
-        hospital,
-        productsDiscussed: structured["Products Discussed"] || draft.products,
-        summary: structured["Summary"] || currentAIResult.raw,
-        sentiment,
-        followUpAction,
-      },
-      sentiment,
-      followUpDate: draft.followUpDate || "2026-07-21",
-    };
-
-    dispatch(addInteraction(newRecord));
-
-    // Update corresponding doctor's lastVisit and interaction count
-    const matchingDoc = hcps.find(
-      (h) => h.name.toLowerCase() === doctorName.toLowerCase()
-    );
-    if (matchingDoc) {
-      dispatch(
-        updateHCP({
-          ...matchingDoc,
-          lastVisit: "Today",
-          interactionCount: (matchingDoc.interactionCount || 0) + 1,
+    setIsSaving(true);
+    try {
+      await dispatch(
+        addInteraction({
+          hcpId: hcp.id,
+          channel: draft.visitType || "In-Person Detailing",
+          products,
+          notes: draft.rawNotes,
+          sentiment,
+          objections: objections
+            ? Array.isArray(objections) ? objections.join("; ") : String(objections)
+            : null,
+          followUpDate: draft.followUpDate || null,
+          summary: structured["Summary"] || currentAIResult.raw,
+          followUpAction: followUpAction || null,
         })
-      );
+      ).unwrap();
+    } catch (err) {
+      toast.error(`Could not save interaction: ${err}`);
+      return;
+    } finally {
+      setIsSaving(false);
     }
+
+    // Server updated the HCP's last visit and interaction count.
+    dispatch(fetchHCPs());
 
     // Add stateful notification
     dispatch(
@@ -322,9 +329,14 @@ ${draft.rawNotes}`;
 
                   <button
                     type="button"
-                    onClick={() => {
-                      dispatch(deleteInteraction(item.id));
-                      toast.success("Log record deleted.");
+                    onClick={async () => {
+                      try {
+                        await dispatch(deleteInteraction(item.id)).unwrap();
+                        toast.success("Log record deleted.");
+                        dispatch(fetchHCPs());
+                      } catch (err) {
+                        toast.error(`Could not delete log: ${err}`);
+                      }
                     }}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition self-end sm:self-auto shrink-0 cursor-pointer"
                     title="Delete log"
@@ -333,6 +345,22 @@ ${draft.rawNotes}`;
                   </button>
                 </div>
               ))}
+            </div>
+          ) : interactions.length === 0 &&
+            (interactionsStatus === "idle" || interactionsStatus === "loading") ? (
+            <div className="p-10 text-center text-sm text-slate-400">
+              Loading interaction logs...
+            </div>
+          ) : interactions.length === 0 && interactionsStatus === "failed" ? (
+            <div role="alert" className="p-10 text-center text-sm text-slate-400">
+              Could not load interaction logs: {interactionsError}{" "}
+              <button
+                type="button"
+                onClick={() => dispatch(fetchInteractions())}
+                className="font-semibold text-teal-700 hover:underline cursor-pointer"
+              >
+                Retry
+              </button>
             </div>
           ) : (
             <div className="p-10 text-center text-sm text-slate-400">

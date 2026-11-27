@@ -22,11 +22,13 @@ import {
   resetFilters,
   setSelectedHCP,
   deleteHCP,
+  fetchHCPs,
 } from "../../redux/slices/hcpSlice";
 import { updateActiveDraft } from "../../redux/slices/interactionSlice";
 import PageHeader from "../../components/common/PageHeader";
 import Button from "../../components/common/Button";
 import EmptyState from "../../components/common/EmptyState";
+import { Skeleton } from "../../components/common/Skeleton";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import HCPTable from "../../components/hcp/HCPTable";
 import HCPCard from "../../components/hcp/HCPCard";
@@ -42,6 +44,8 @@ export default function HCP() {
 
   const {
     items: hcps,
+    status: hcpStatus,
+    error: hcpError,
     selectedHCP,
     searchQuery,
     filterSpecialty,
@@ -117,11 +121,16 @@ export default function HCP() {
     setIsEditModalOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (deletingHCP) {
-      dispatch(deleteHCP(deletingHCP.id));
-      toast.success(`${deletingHCP.name} has been removed.`);
+      const doctor = deletingHCP;
       setDeletingHCP(null);
+      try {
+        await dispatch(deleteHCP(doctor.id)).unwrap();
+        toast.success(`${doctor.name} has been removed.`);
+      } catch (err) {
+        toast.error(`Could not remove ${doctor.name}: ${err}`);
+      }
     }
   };
 
@@ -445,7 +454,20 @@ export default function HCP() {
       </div>
 
       {/* Main Listing View */}
-      {filteredHCPs.length > 0 ? (
+      {hcps.length === 0 && (hcpStatus === "idle" || hcpStatus === "loading") ? (
+        <div className="bg-white rounded-2xl border border-slate-200/90 card-shadow p-5 space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
+        </div>
+      ) : hcps.length === 0 && hcpStatus === "failed" ? (
+        <EmptyState
+          title="Could not load Healthcare Professionals"
+          description={hcpError || "The server could not be reached."}
+          actionLabel="Retry"
+          onAction={() => dispatch(fetchHCPs())}
+        />
+      ) : filteredHCPs.length > 0 ? (
         viewMode === "table" ? (
           <HCPTable
             hcps={filteredHCPs}

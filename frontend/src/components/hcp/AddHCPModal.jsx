@@ -39,16 +39,26 @@ export default function AddHCPModal({ isOpen, onClose }) {
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSaving) return;
     if (!validate()) {
       toast.error("Please fill in required fields.");
       return;
     }
 
-    dispatch(addHCP(formData));
-    toast.success(`${formData.name} added to HCP Directory!`);
-    onClose();
+    setIsSaving(true);
+    try {
+      await dispatch(addHCP(formData)).unwrap();
+      toast.success(`${formData.name} added to HCP Directory!`);
+      onClose();
+    } catch (err) {
+      toast.error(`Could not add HCP: ${err}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const toggleProduct = (prodName) => {
@@ -70,8 +80,18 @@ export default function AddHCPModal({ isOpen, onClose }) {
       title="Add Healthcare Professional"
       subtitle="Register a new doctor, key opinion leader, or hospital account"
       maxWidth="max-w-2xl"
+      footer={
+        <>
+          <Button variant="outline" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" size="sm" type="submit" form="add-hcp-form" disabled={isSaving}>
+            Save Healthcare Professional
+          </Button>
+        </>
+      }
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form id="add-hcp-form" onSubmit={handleSubmit} className="space-y-4">
         {/* Name & Credentials */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -265,16 +285,6 @@ export default function AddHCPModal({ isOpen, onClose }) {
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             className="w-full text-xs sm:text-sm p-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           />
-        </div>
-
-        {/* Actions */}
-        <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-          <Button variant="outline" size="sm" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" size="sm" type="submit">
-            Save Healthcare Professional
-          </Button>
         </div>
       </form>
     </Modal>

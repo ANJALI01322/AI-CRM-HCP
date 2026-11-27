@@ -1,3 +1,5 @@
+import threading
+import time
 from functools import lru_cache
 
 from groq import Groq
@@ -24,7 +26,23 @@ def get_llm() -> ChatGroq:
     )
 
 
+_LLM_CHECK_TTL_SECONDS = 60
+_llm_check_cache: tuple[float, str] | None = None
+_llm_check_lock = threading.Lock()
+
+
 def check_llm() -> str:
+    """Cached for 60s so health polling doesn't hit Groq on every request."""
+    global _llm_check_cache
+    with _llm_check_lock:
+        if _llm_check_cache and time.monotonic() - _llm_check_cache[0] < _LLM_CHECK_TTL_SECONDS:
+            return _llm_check_cache[1]
+        result = _check_llm_uncached()
+        _llm_check_cache = (time.monotonic(), result)
+        return result
+
+
+def _check_llm_uncached() -> str:
     """Verify the key and model with Groq's models endpoint (no tokens spent). Never raises."""
     if not config.GROQ_API_KEY:
         return "error: GROQ_API_KEY is not set"

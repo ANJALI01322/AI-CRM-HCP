@@ -13,7 +13,7 @@ class DatabaseNotConfigured(RuntimeError):
     pass
 
 
-def _normalize_url(url: str) -> str:
+def normalize_url(url: str) -> str:
     # Neon / Heroku style "postgres://" URLs are rejected by SQLAlchemy 2.x.
     if url.startswith("postgres://"):
         return "postgresql://" + url[len("postgres://"):]
@@ -25,7 +25,7 @@ def get_engine() -> Engine:
     """Create the engine on first use so a missing DATABASE_URL never breaks app import."""
     if not config.DATABASE_URL:
         raise DatabaseNotConfigured("DATABASE_URL is not set")
-    return create_engine(_normalize_url(config.DATABASE_URL), pool_pre_ping=True)
+    return create_engine(normalize_url(config.DATABASE_URL), pool_pre_ping=True)
 
 
 @lru_cache(maxsize=1)

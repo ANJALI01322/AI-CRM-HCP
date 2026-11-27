@@ -1,5 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { X } from "lucide-react";
+import { createPortal } from "react-dom";
+import useBodyScrollLock from "../../hooks/useBodyScrollLock";
 
 export default function Drawer({
   isOpen,
@@ -10,25 +12,25 @@ export default function Drawer({
   width = "max-w-2xl",
   footer,
 }) {
+  useBodyScrollLock(isOpen);
+
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
     const handleKeyDown = (e) => {
-      if (e.key === "Escape" && isOpen) {
-        onClose();
-      }
+      if (e.key === "Escape") onCloseRef.current?.();
     };
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      window.addEventListener("keydown", handleKeyDown);
-    }
-    return () => {
-      document.body.style.overflow = "unset";
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, onClose]);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 overflow-hidden">
       {/* Backdrop */}
       <div
@@ -75,6 +77,7 @@ export default function Drawer({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

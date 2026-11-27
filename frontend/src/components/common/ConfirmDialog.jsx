@@ -14,7 +14,26 @@ export default function ConfirmDialog({
   isLoading = false,
 }) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-md">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      maxWidth="max-w-md"
+      footer={
+        <>
+          <Button variant="outline" size="sm" onClick={onClose} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button
+            variant={confirmVariant}
+            size="sm"
+            onClick={onConfirm}
+            isLoading={isLoading}
+          >
+            {confirmLabel}
+          </Button>
+        </>
+      }
+    >
       <div className="flex items-start gap-4">
         <div className="w-10 h-10 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shrink-0">
           <AlertTriangle className="w-5 h-5" />
@@ -26,20 +45,6 @@ export default function ConfirmDialog({
             {message}
           </p>
         </div>
-      </div>
-
-      <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-        <Button variant="outline" size="sm" onClick={onClose} disabled={isLoading}>
-          Cancel
-        </Button>
-        <Button
-          variant={confirmVariant}
-          size="sm"
-          onClick={onConfirm}
-          isLoading={isLoading}
-        >
-          {confirmLabel}
-        </Button>
       </div>
     </Modal>
   );

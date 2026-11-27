@@ -534,6 +534,18 @@ export default function Dashboard() {
           onClose={() => setSelectedActivity(null)}
           title={`Detailing Log: ${selectedActivity.doctorName}`}
           subtitle={`${selectedActivity.hospital} • ${selectedActivity.date}`}
+          footer={
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => {
+                setSelectedActivity(null);
+                navigate("/interaction");
+              }}
+            >
+              Log New Detailing for this Doctor
+            </Button>
+          }
         >
           <div className="space-y-4 text-sm">
             <div className="flex items-center gap-2 flex-wrap">
@@ -580,19 +592,6 @@ export default function Dashboard() {
                   </span>
                 ))}
               </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-100 flex justify-end">
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => {
-                  setSelectedActivity(null);
-                  navigate("/interaction");
-                }}
-              >
-                Log New Detailing for this Doctor
-              </Button>
             </div>
           </div>
         </Modal>

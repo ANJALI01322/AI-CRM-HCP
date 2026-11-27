@@ -24,10 +24,12 @@ import {
 import Button from "../common/Button";
 import HCPAvatar from "../common/HCPAvatar";
 import CommandPalette from "../common/CommandPalette";
+import useApiHealth from "../../hooks/useApiHealth";
 
 export default function Navbar() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const apiHealth = useApiHealth();
 
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -261,8 +263,8 @@ export default function Navbar() {
             <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 font-semibold">
               3 Actions Required Today
             </span>
-            <span className="text-slate-400 hidden sm:inline">
-              Sync: Live (Local Store)
+            <span className="text-slate-400 hidden sm:inline" title={apiHealth.detail}>
+              Sync: {apiHealth.label}
             </span>
           </div>
         </div>

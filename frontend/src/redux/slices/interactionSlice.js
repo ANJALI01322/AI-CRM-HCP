@@ -1,37 +1,34 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { INITIAL_INTERACTIONS } from "../../constants/mockData";
+import * as crmApi from "../../services/crmApi";
+import { apiThunk } from "../apiThunk";
 
-const loadInteractionsFromStorage = () => {
-  try {
-    const saved = localStorage.getItem("omni_crm_interactions");
-    if (saved) return JSON.parse(saved);
-  } catch (e) {
-    console.warn("Could not load interactions from localStorage", e);
-  }
-  return INITIAL_INTERACTIONS;
-};
+export const fetchInteractions = apiThunk("interaction/fetchAll", () =>
+  crmApi.listInteractions()
+);
+export const addInteraction = apiThunk("interaction/add", (payload) =>
+  crmApi.createInteraction(payload)
+);
+export const deleteInteraction = apiThunk("interaction/delete", (id) =>
+  crmApi.deleteInteraction(id)
+);
 
-const saveInteractionsToStorage = (interactions) => {
-  try {
-    localStorage.setItem("omni_crm_interactions", JSON.stringify(interactions));
-  } catch (e) {
-    console.warn("Could not save interactions to localStorage", e);
-  }
+const EMPTY_DRAFT = {
+  doctorName: "",
+  hospital: "",
+  specialty: "",
+  visitType: "In-Person Detailing",
+  products: ["CardioPlus 50mg"],
+  rawNotes: "",
+  followUpDate: "",
 };
 
 const initialState = {
-  items: loadInteractionsFromStorage(),
+  items: [],
+  status: "idle", // 'idle' | 'loading' | 'succeeded' | 'failed'
+  error: null,
   currentAIResult: null,
   isGeneratingAI: false,
-  activeDraft: {
-    doctorName: "",
-    hospital: "",
-    specialty: "",
-    visitType: "In-Person Detailing",
-    products: ["CardioPlus 50mg"],
-    rawNotes: "",
-    followUpDate: "",
-  },
+  activeDraft: EMPTY_DRAFT,
   searchQuery: "",
 };
 
@@ -39,31 +36,6 @@ export const interactionSlice = createSlice({
   name: "interaction",
   initialState,
   reducers: {
-    addInteraction: (state, action) => {
-      const newInteraction = {
-        id: `int-${Date.now()}`,
-        date: new Date().toISOString().split("T")[0],
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        status: "Completed",
-        ...action.payload,
-      };
-      state.items.unshift(newInteraction);
-      saveInteractionsToStorage(state.items);
-      state.currentAIResult = null;
-      state.activeDraft = {
-        doctorName: "",
-        hospital: "",
-        specialty: "",
-        visitType: "In-Person Detailing",
-        products: ["CardioPlus 50mg"],
-        rawNotes: "",
-        followUpDate: "",
-      };
-    },
-    deleteInteraction: (state, action) => {
-      state.items = state.items.filter((item) => item.id !== action.payload);
-      saveInteractionsToStorage(state.items);
-    },
     setCurrentAIResult: (state, action) => {
       state.currentAIResult = action.payload;
     },
@@ -80,11 +52,32 @@ export const interactionSlice = createSlice({
       state.searchQuery = action.payload;
     },
   },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchInteractions.pending, (state) => {
+        state.status = "loading";
+        state.error = null;
+      })
+      .addCase(fetchInteractions.fulfilled, (state, action) => {
+        state.status = "succeeded";
+        state.items = action.payload;
+      })
+      .addCase(fetchInteractions.rejected, (state, action) => {
+        state.status = "failed";
+        state.error = action.payload || action.error.message;
+      })
+      .addCase(addInteraction.fulfilled, (state, action) => {
+        state.items.unshift(action.payload);
+        state.currentAIResult = null;
+        state.activeDraft = EMPTY_DRAFT;
+      })
+      .addCase(deleteInteraction.fulfilled, (state, action) => {
+        state.items = state.items.filter((item) => item.id !== action.payload);
+      });
+  },
 });
 
 export const {
-  addInteraction,
-  deleteInteraction,
   setCurrentAIResult,
   clearCurrentAIResult,
   setIsGeneratingAI,

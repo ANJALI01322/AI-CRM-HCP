@@ -63,10 +63,13 @@ venv\Scripts\activate
 
 pip install -r requirements.txt
 
+alembic upgrade head   # create/upgrade tables
+python seed.py         # load demo org data (once)
+
 python -m uvicorn app.main:app --reload
 ```
 
-Create `backend/.env` with `GROQ_API_KEY` and `DATABASE_URL` (optional: `MODEL_NAME`, `ALLOWED_ORIGINS`).
+Copy `backend/.env.example` to `backend/.env` and fill in `DATABASE_URL` and `GROQ_API_KEY`.
 All routes are served under `/api`. In dev, Vite proxies `/api` to `http://localhost:8000`.
 
 Check configuration at `/api/health` — it returns `{status, db, llm}` and HTTP 503 if anything is misconfigured.

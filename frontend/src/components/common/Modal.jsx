@@ -1,5 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { X } from "lucide-react";
+import { createPortal } from "react-dom";
+import useBodyScrollLock from "../../hooks/useBodyScrollLock";
 
 export default function Modal({
   isOpen,
@@ -7,29 +9,30 @@ export default function Modal({
   title,
   subtitle,
   children,
+  footer,
   maxWidth = "max-w-2xl",
   className = "",
 }) {
+  useBodyScrollLock(isOpen);
+
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
     const handleKeyDown = (e) => {
-      if (e.key === "Escape" && isOpen) {
-        onClose();
-      }
+      if (e.key === "Escape") onCloseRef.current?.();
     };
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      window.addEventListener("keydown", handleKeyDown);
-    }
-    return () => {
-      document.body.style.overflow = "unset";
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, onClose]);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+  return createPortal(
+    <div className="fixed inset-0 z-50">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-fade-in"
@@ -37,14 +40,16 @@ export default function Modal({
       />
 
       {/* Dialog container */}
-      <div className="flex min-h-full items-center justify-center p-4 text-center sm:p-6">
+      <div className="relative flex h-full items-center justify-center p-4 text-center sm:p-6 pointer-events-none">
         <div
-          className={`w-full ${maxWidth} transform overflow-hidden rounded-2xl bg-white text-left align-middle modal-shadow border border-slate-200/80 transition-all animate-fade-in ${className}`}
+          role="dialog"
+          aria-modal="true"
+          className={`pointer-events-auto flex flex-col max-h-[90vh] w-full ${maxWidth} transform overflow-hidden rounded-2xl bg-white text-left align-middle modal-shadow border border-slate-200/80 transition-all animate-fade-in ${className}`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           {(title || subtitle) && (
-            <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 bg-slate-50/50">
+            <div className="shrink-0 flex items-center justify-between px-6 py-4.5 border-b border-slate-100 bg-slate-50/50">
               <div>
                 {title && (
                   <h3 className="text-lg font-semibold text-slate-900 leading-tight">
@@ -66,11 +71,19 @@ export default function Modal({
           )}
 
           {/* Body */}
-          <div className="px-6 py-5 max-h-[80vh] overflow-y-auto custom-scrollbar">
+          <div className="flex-1 min-h-0 px-6 py-5 overflow-y-auto overscroll-contain custom-scrollbar">
             {children}
           </div>
+
+          {/* Footer (stays visible while the body scrolls) */}
+          {footer && (
+            <div className="shrink-0 px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              {footer}
+            </div>
+          )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

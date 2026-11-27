@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 export default function EditHCPModal({ isOpen, onClose, doctor }) {
   const dispatch = useDispatch();
   const [formData, setFormData] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (doctor) {
@@ -21,16 +22,24 @@ export default function EditHCPModal({ isOpen, onClose, doctor }) {
 
   if (!formData) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSaving) return;
     if (!formData.name?.trim()) {
       toast.error("Doctor Name is required.");
       return;
     }
 
-    dispatch(updateHCP(formData));
-    toast.success(`Updated profile for ${formData.name}`);
-    onClose();
+    setIsSaving(true);
+    try {
+      await dispatch(updateHCP(formData)).unwrap();
+      toast.success(`Updated profile for ${formData.name}`);
+      onClose();
+    } catch (err) {
+      toast.error(`Could not update HCP: ${err}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const toggleProduct = (prodName) => {
@@ -53,8 +62,18 @@ export default function EditHCPModal({ isOpen, onClose, doctor }) {
       title={`Edit Profile: ${formData.name}`}
       subtitle="Update doctor details, affiliation, and prescribing tier"
       maxWidth="max-w-2xl"
+      footer={
+        <>
+          <Button variant="outline" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" size="sm" type="submit" form="edit-hcp-form" disabled={isSaving}>
+            Save Changes
+          </Button>
+        </>
+      }
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form id="edit-hcp-form" onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -245,15 +264,6 @@ export default function EditHCPModal({ isOpen, onClose, doctor }) {
             }
             className="w-full text-xs sm:text-sm p-2.5 rounded-lg border border-slate-300 bg-white"
           />
-        </div>
-
-        <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-          <Button variant="outline" size="sm" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" size="sm" type="submit">
-            Save Changes
-          </Button>
         </div>
       </form>
     </Modal>
