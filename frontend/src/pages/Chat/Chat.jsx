@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import {
   Sparkles,
   Send,
@@ -18,13 +18,14 @@ import {
 } from "lucide-react";
 import { askAI } from "../../services/interactionService";
 import { updateActiveDraft } from "../../redux/slices/interactionSlice";
+import { getInitials } from "../../components/common/HCPAvatar";
 import PageHeader from "../../components/common/PageHeader";
 import Button from "../../components/common/Button";
 import Badge from "../../components/common/Badge";
 import toast from "react-hot-toast";
 
 const SUGGESTED_PROMPTS = [
-  "Which HCPs need attention in Delhi NCR today?",
+  "Which HCPs need attention today?",
   "Prepare talking points for Dr. Rahul Sharma on CardioPlus 50mg Phase-3 trial data.",
   "Summarize key objections regarding NeuroGuard XR pricing vs generics.",
   "What is the institutional strategy for OncoShield AIIMS P&T committee review?",
@@ -33,6 +34,7 @@ const SUGGESTED_PROMPTS = [
 export default function Chat() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const user = useSelector((state) => state.auth.user);
 
   const [messages, setMessages] = useState([
     {
@@ -192,7 +194,7 @@ export default function Chat() {
               {msg.sender === "user" ? (
                 <div className="flex items-start gap-3 flex-row-reverse">
                   <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-xs font-bold text-xs">
-                    AR
+                    {getInitials(user?.fullName)}
                   </div>
                   <div className="bg-slate-900 text-white rounded-2xl rounded-tr-none p-4 leading-relaxed text-sm max-w-xl shadow-xs font-medium">
                     {msg.text}

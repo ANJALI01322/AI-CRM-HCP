@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.crud import count, get_owned, update_fields
+from app.api.crud import check_org_user, count, get_owned, scope, update_fields
 from app.api.deps import Pagination, RequestContext, db_session, get_context, pagination
 from app.models import HCP, Interaction
 from app.schemas.common import Page
@@ -13,15 +13,23 @@ router = APIRouter(prefix="/hcps", tags=["HCPs"])
 REQUIRED = {"name", "specialty", "hospital", "city", "priority", "status", "products_of_interest"}
 
 
-def _interaction_counts(db: Session, hcp_ids: list[int]) -> dict[int, int]:
+def _interaction_counts(db: Session, ctx: RequestContext, hcp_ids: list[int]) -> dict[int, int]:
     if not hcp_ids:
         return {}
     rows = db.execute(
         select(Interaction.hcp_id, func.count())
-        .where(Interaction.hcp_id.in_(hcp_ids))
+        .where(Interaction.hcp_id.in_(hcp_ids), *scope(Interaction, ctx))
         .group_by(Interaction.hcp_id)
     )
     return dict(rows.all())
+
+
+def _assignee(db: Session, ctx: RequestContext, requested: int | None) -> int | None:
+    if not ctx.is_manager:
+        return ctx.user_id
+    if requested is not None:
+        check_org_user(db, requested, ctx.org_id)
+    return requested
 
 
 def _out(hcp: HCP, interaction_count: int) -> HCPOut:
@@ -36,9 +44,9 @@ def list_hcps(
     ctx: RequestContext = Depends(get_context),
     db: Session = Depends(db_session),
 ):
-    query = select(HCP).where(HCP.org_id == ctx.org_id).order_by(HCP.name, HCP.id)
+    query = select(HCP).where(*scope(HCP, ctx)).order_by(HCP.name, HCP.id)
     hcps = db.scalars(query.limit(page.limit).offset(page.offset)).all()
-    counts = _interaction_counts(db, [h.id for h in hcps])
+    counts = _interaction_counts(db, ctx, [h.id for h in hcps])
     return Page(
         items=[_out(h, counts.get(h.id, 0)) for h in hcps],
         total=count(db, query),
@@ -49,13 +57,15 @@ def list_hcps(
 
 @router.get("/{hcp_id}", response_model=HCPOut)
 def get_hcp(hcp_id: int, ctx: RequestContext = Depends(get_context), db: Session = Depends(db_session)):
-    hcp = get_owned(db, HCP, hcp_id, ctx.org_id, "HCP")
-    return _out(hcp, _interaction_counts(db, [hcp.id]).get(hcp.id, 0))
+    hcp = get_owned(db, HCP, hcp_id, ctx, "HCP")
+    return _out(hcp, _interaction_counts(db, ctx, [hcp.id]).get(hcp.id, 0))
 
 
 @router.post("", response_model=HCPOut, status_code=201)
 def create_hcp(payload: HCPCreate, ctx: RequestContext = Depends(get_context), db: Session = Depends(db_session)):
-    hcp = HCP(**payload.model_dump(by_alias=False), org_id=ctx.org_id)
+    data = payload.model_dump(by_alias=False)
+    data["assigned_user_id"] = _assignee(db, ctx, data.get("assigned_user_id"))
+    hcp = HCP(**data, org_id=ctx.org_id)
     db.add(hcp)
     db.commit()
     db.refresh(hcp)
@@ -69,16 +79,20 @@ def update_hcp(
     ctx: RequestContext = Depends(get_context),
     db: Session = Depends(db_session),
 ):
-    hcp = get_owned(db, HCP, hcp_id, ctx.org_id, "HCP")
+    hcp = get_owned(db, HCP, hcp_id, ctx, "HCP")
+    if "assigned_user_id" in payload.model_fields_set:
+        if not ctx.is_manager:
+            raise HTTPException(status_code=403, detail="Only managers can reassign HCPs")
+        _assignee(db, ctx, payload.assigned_user_id)
     update_fields(hcp, payload, REQUIRED)
     db.commit()
     db.refresh(hcp)
-    return _out(hcp, _interaction_counts(db, [hcp.id]).get(hcp.id, 0))
+    return _out(hcp, _interaction_counts(db, ctx, [hcp.id]).get(hcp.id, 0))
 
 
 @router.delete("/{hcp_id}", status_code=204)
 def delete_hcp(hcp_id: int, ctx: RequestContext = Depends(get_context), db: Session = Depends(db_session)):
     """Also deletes the HCP's interactions and follow-ups (ON DELETE CASCADE)."""
-    db.delete(get_owned(db, HCP, hcp_id, ctx.org_id, "HCP"))
+    db.delete(get_owned(db, HCP, hcp_id, ctx, "HCP"))
     db.commit()
     return Response(status_code=204)

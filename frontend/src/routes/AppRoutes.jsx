@@ -4,48 +4,25 @@ import Dashboard from "../pages/Dashboard/Dashboard";
 import HCP from "../pages/HCP/HCP";
 import Interaction from "../pages/Interaction/Interaction";
 import Chat from "../pages/Chat/Chat";
+import Login from "../pages/Login/Login";
 import NotFound from "../pages/NotFound/NotFound";
 import MainLayout from "../layouts/MainLayout";
+import ProtectedRoute from "./ProtectedRoute";
+
+const page = (element) => (
+  <ProtectedRoute>
+    <MainLayout>{element}</MainLayout>
+  </ProtectedRoute>
+);
 
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route
-        path="/"
-        element={
-          <MainLayout>
-            <Dashboard />
-          </MainLayout>
-        }
-      />
-
-      <Route
-        path="/hcp"
-        element={
-          <MainLayout>
-            <HCP />
-          </MainLayout>
-        }
-      />
-
-      <Route
-        path="/interaction"
-        element={
-          <MainLayout>
-            <Interaction />
-          </MainLayout>
-        }
-      />
-
-      <Route
-        path="/chat"
-        element={
-          <MainLayout>
-            <Chat />
-          </MainLayout>
-        }
-      />
-
+      <Route path="/login" element={<Login />} />
+      <Route path="/" element={page(<Dashboard />)} />
+      <Route path="/hcp" element={page(<HCP />)} />
+      <Route path="/interaction" element={page(<Interaction />)} />
+      <Route path="/chat" element={page(<Chat />)} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

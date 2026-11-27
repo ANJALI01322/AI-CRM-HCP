@@ -3,6 +3,10 @@
 Usage (from backend/, after `alembic upgrade head`):
     python seed.py           # seeds once; skips if the demo org already has data
     python seed.py --reset   # deletes the demo org's data and seeds again
+
+Demo logins (password for both: Demo@123):
+    rep@demo.com       field rep, sees the HCPs assigned to them
+    manager@demo.com   manager, sees the whole organization
 """
 
 import argparse
@@ -13,15 +17,21 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core import config
+from app.core.security import hash_password
 from app.database.database import get_engine
 from app.models import HCP, FollowUp, Interaction, Organization, Product, User
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
+DEMO_PASSWORD = "Demo@123"
+
 USERS = [
-    {"full_name": "Arjun Rao", "email": "arjun.rao@demo.omnihealth.example", "role": "rep"},
-    {"full_name": "Kavita Nair", "email": "kavita.nair@demo.omnihealth.example", "role": "manager"},
+    {"full_name": "Arjun Rao", "email": "rep@demo.com", "role": "rep"},
+    {"full_name": "Kavita Nair", "email": "manager@demo.com", "role": "manager"},
 ]
+
+# HCPs left unassigned are visible to the manager only.
+UNASSIGNED_HCPS = {"hcp-7", "hcp-8"}
 
 PRODUCTS = [
     {"name": "CardioPlus 50mg", "category": "Cardiovascular", "indication": "Hypertension & Heart Failure", "formula": "Metoprolol Succinate + Telmisartan", "status": "Primary Focus"},
@@ -162,14 +172,24 @@ def seed(db: Session, reset: bool) -> None:
         print(f"Org '{org.slug}' already has data; nothing to do (use --reset to reseed).")
         return
 
-    users = [User(org_id=org.id, **u) for u in USERS]
+    password_hash = hash_password(DEMO_PASSWORD)
+    users = [User(org_id=org.id, password_hash=password_hash, **u) for u in USERS]
     db.add_all(users)
     db.add_all(Product(org_id=org.id, **p) for p in PRODUCTS)
-    hcps = {h["key"]: HCP(org_id=org.id, **{k: v for k, v in h.items() if k != "key"}) for h in HCPS}
-    db.add_all(hcps.values())
     db.flush()
 
     rep = users[0]
+    hcps = {
+        h["key"]: HCP(
+            org_id=org.id,
+            assigned_user_id=None if h["key"] in UNASSIGNED_HCPS else rep.id,
+            **{k: v for k, v in h.items() if k != "key"},
+        )
+        for h in HCPS
+    }
+    db.add_all(hcps.values())
+    db.flush()
+
     for item in INTERACTIONS:
         data = {k: v for k, v in item.items() if k != "hcp"}
         hcp = hcps[item["hcp"]]

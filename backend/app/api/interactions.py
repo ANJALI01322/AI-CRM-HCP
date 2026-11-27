@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.crud import count, get_owned, update_fields
+from app.api.crud import count, get_owned, scope, update_fields
 from app.api.deps import Pagination, RequestContext, db_session, get_context, pagination
 from app.models import HCP, FollowUp, Interaction
 from app.schemas.common import Page
@@ -13,8 +13,8 @@ router = APIRouter(prefix="/interactions", tags=["Interactions"])
 REQUIRED = {"channel", "products", "notes", "occurred_at"}
 
 
-def _load(db: Session, interaction_id: int, org_id: int) -> Interaction:
-    get_owned(db, Interaction, interaction_id, org_id, "Interaction")
+def _load(db: Session, interaction_id: int, ctx: RequestContext) -> Interaction:
+    get_owned(db, Interaction, interaction_id, ctx, "Interaction")
     return db.scalar(
         select(Interaction)
         .options(joinedload(Interaction.hcp))
@@ -30,7 +30,7 @@ def list_interactions(
     ctx: RequestContext = Depends(get_context),
     db: Session = Depends(db_session),
 ):
-    query = select(Interaction).where(Interaction.org_id == ctx.org_id)
+    query = select(Interaction).where(*scope(Interaction, ctx))
     if hcp_id is not None:
         query = query.where(Interaction.hcp_id == hcp_id)
     query = query.order_by(Interaction.occurred_at.desc(), Interaction.id.desc())
@@ -44,7 +44,7 @@ def list_interactions(
 def get_interaction(
     interaction_id: int, ctx: RequestContext = Depends(get_context), db: Session = Depends(db_session)
 ):
-    return _load(db, interaction_id, ctx.org_id)
+    return _load(db, interaction_id, ctx)
 
 
 @router.post("", response_model=InteractionOut, status_code=201)
@@ -52,7 +52,7 @@ def create_interaction(
     payload: InteractionCreate, ctx: RequestContext = Depends(get_context), db: Session = Depends(db_session)
 ):
     """Also updates the HCP's last visit and opens a follow-up when followUpDate is set."""
-    hcp = get_owned(db, HCP, payload.hcp_id, ctx.org_id, "HCP")
+    hcp = get_owned(db, HCP, payload.hcp_id, ctx, "HCP")
     data = payload.model_dump(by_alias=False, exclude_none=True)
     interaction = Interaction(**data, org_id=ctx.org_id, user_id=ctx.user_id)
     db.add(interaction)
@@ -75,7 +75,7 @@ def create_interaction(
             )
         )
     db.commit()
-    return _load(db, interaction.id, ctx.org_id)
+    return _load(db, interaction.id, ctx)
 
 
 @router.patch("/{interaction_id}", response_model=InteractionOut)
@@ -85,16 +85,16 @@ def update_interaction(
     ctx: RequestContext = Depends(get_context),
     db: Session = Depends(db_session),
 ):
-    interaction = get_owned(db, Interaction, interaction_id, ctx.org_id, "Interaction")
+    interaction = get_owned(db, Interaction, interaction_id, ctx, "Interaction")
     update_fields(interaction, payload, REQUIRED)
     db.commit()
-    return _load(db, interaction_id, ctx.org_id)
+    return _load(db, interaction_id, ctx)
 
 
 @router.delete("/{interaction_id}", status_code=204)
 def delete_interaction(
     interaction_id: int, ctx: RequestContext = Depends(get_context), db: Session = Depends(db_session)
 ):
-    db.delete(get_owned(db, Interaction, interaction_id, ctx.org_id, "Interaction"))
+    db.delete(get_owned(db, Interaction, interaction_id, ctx, "Interaction"))
     db.commit()
     return Response(status_code=204)

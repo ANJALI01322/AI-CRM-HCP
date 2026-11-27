@@ -21,6 +21,8 @@ class HCPFields(CamelModel):
     notes: str | None = Field(None, max_length=5000)
     avatar: str | None = Field(None, max_length=500)
     last_visit: date | None = None
+    # Managers may assign any rep in the org; for reps it is always themselves.
+    assigned_user_id: int | None = Field(None, gt=0)
 
 
 class HCPCreate(HCPFields):

@@ -1,11 +1,10 @@
 from datetime import date, datetime
 
 from sqlalchemy import Date, DateTime, ForeignKey, String, Text, func, text
-from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.database import Base
-from app.models.base import OrgScopedMixin
+from app.models.base import OrgScopedMixin, StringArray
 from app.models.hcp import HCP
 
 
@@ -21,7 +20,7 @@ class Interaction(OrgScopedMixin, Base):
     )
     channel: Mapped[str] = mapped_column(String(80), nullable=False)
     products: Mapped[list[str]] = mapped_column(
-        ARRAY(String(120)), nullable=False, server_default=text("'{}'")
+        StringArray, nullable=False, server_default=text("'{}'")
     )
     notes: Mapped[str] = mapped_column(Text, nullable=False)
     sentiment: Mapped[str | None] = mapped_column(String(32))

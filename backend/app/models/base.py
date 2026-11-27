@@ -1,7 +1,11 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, func
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column
+
+# Postgres text[]; JSON on SQLite so the test suite runs without a database server.
+StringArray = ARRAY(String(120)).with_variant(JSON(), "sqlite")
 
 
 class TimestampMixin:

@@ -37,6 +37,7 @@ export default function Navbar() {
   const notifRef = useRef(null);
 
   const notifications = useSelector((state) => state.ui.notifications);
+  const user = useSelector((state) => state.auth.user);
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
 
   // Click outside to close notification panel
@@ -237,8 +238,7 @@ export default function Navbar() {
             {/* Rep Profile Avatar */}
             <div className="flex items-center pl-1 border-l border-slate-200">
               <HCPAvatar
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-                name="Anjali Rao"
+                name={user?.fullName || ""}
                 size="xs"
                 showStatus
                 statusColor="bg-emerald-400"
@@ -251,10 +251,10 @@ export default function Navbar() {
         <div className="bg-slate-50/90 border-t border-slate-200/70 px-4 sm:px-6 py-1.5 flex items-center justify-between text-[11px] text-slate-500 overflow-x-auto custom-scrollbar">
           <div className="flex items-center gap-2 font-medium shrink-0">
             <span className="flex items-center gap-1 text-slate-900 font-semibold">
-              <MapPin className="w-3 h-3 text-teal-600" /> Delhi NCR
+              <MapPin className="w-3 h-3 text-teal-600" /> {user?.orgName}
             </span>
             <span className="text-slate-300">/</span>
-            <span>Territory Field Ops</span>
+            <span>{user?.role === "manager" ? "Organization View" : "My Territory"}</span>
             <span className="text-slate-300">/</span>
             <span className="font-mono text-slate-600">Q3 2026 • Week 37</span>
           </div>

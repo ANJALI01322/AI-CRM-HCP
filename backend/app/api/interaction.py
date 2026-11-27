@@ -1,14 +1,15 @@
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.agents.crm_agent import LLMNotConfigured
+from app.api.deps import get_context
 from app.langgraph.workflow import crm_graph
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/interaction", tags=["Interaction"])
+router = APIRouter(prefix="/interaction", tags=["Interaction"], dependencies=[Depends(get_context)])
 
 
 class InteractionRequest(BaseModel):

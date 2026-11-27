@@ -19,9 +19,12 @@ DATABASE_URL = _clean(os.getenv("DATABASE_URL"))
 GROQ_API_KEY = _clean(os.getenv("GROQ_API_KEY"))
 MODEL_NAME = _clean(os.getenv("MODEL_NAME")) or DEFAULT_MODEL_NAME
 
-# Until auth exists, every request acts as this org / user (created by seed.py).
+# Slug of the organization created by seed.py.
 DEMO_ORG_SLUG = _clean(os.getenv("DEMO_ORG_SLUG")) or "demo"
-DEMO_USER_EMAIL = _clean(os.getenv("DEMO_USER_EMAIL"))
+
+# Required for login. Use a long random value (e.g. `python -c "import secrets; print(secrets.token_urlsafe(48))"`).
+JWT_SECRET = _clean(os.getenv("JWT_SECRET"))
+JWT_EXPIRE_HOURS = 24
 
 ALLOWED_ORIGINS = [
     origin.strip().rstrip("/")

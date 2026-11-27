@@ -1,6 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+from app.api.deps import get_context
+
+router = APIRouter(prefix="/dashboard", tags=["Dashboard"], dependencies=[Depends(get_context)])
 
 @router.get("/stats")
 def get_stats():

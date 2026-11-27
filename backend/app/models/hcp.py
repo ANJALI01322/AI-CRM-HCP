@@ -1,11 +1,10 @@
 from datetime import date
 
-from sqlalchemy import Date, String, Text, text
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy import Date, ForeignKey, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.database import Base
-from app.models.base import OrgScopedMixin
+from app.models.base import OrgScopedMixin, StringArray
 
 
 class HCP(OrgScopedMixin, Base):
@@ -27,8 +26,12 @@ class HCP(OrgScopedMixin, Base):
     preferred_time: Mapped[str | None] = mapped_column(String(120))
     prescribing_potential: Mapped[str | None] = mapped_column(String(120))
     products_of_interest: Mapped[list[str]] = mapped_column(
-        ARRAY(String(120)), nullable=False, server_default=text("'{}'")
+        StringArray, nullable=False, server_default=text("'{}'")
     )
     notes: Mapped[str | None] = mapped_column(Text)
     avatar: Mapped[str | None] = mapped_column(String(500))
     last_visit: Mapped[date | None] = mapped_column(Date)
+    # Rep responsible for this HCP. Reps only see HCPs assigned to them; managers see all.
+    assigned_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )

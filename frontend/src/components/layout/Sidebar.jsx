@@ -14,11 +14,13 @@ import {
   Layers,
   Radio,
   X,
+  LogOut,
 } from "lucide-react";
 import {
   toggleSidebarCollapse,
   setMobileSidebarOpen,
 } from "../../redux/slices/uiSlice";
+import { logout, ROLE_LABELS } from "../../redux/slices/authSlice";
 
 const navigationGroups = [
   {
@@ -72,6 +74,7 @@ export default function Sidebar() {
     (state) => state.ui
   );
   const hcps = useSelector((state) => state.hcp.items);
+  const user = useSelector((state) => state.auth.user);
   const schedule = useSelector((state) => state.dashboard.schedule);
 
   const pendingVisitsCount = schedule.filter(
@@ -207,8 +210,7 @@ export default function Sidebar() {
       <div className="p-3 border-t border-slate-800/80 bg-slate-950">
         <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-900 transition">
           <HCPAvatar
-            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-            name="Anjali Rao"
+            name={user?.fullName || ""}
             size="sm"
             showStatus
             statusColor="bg-teal-400"
@@ -217,12 +219,24 @@ export default function Sidebar() {
           {!isSidebarCollapsed && (
             <div className="flex flex-col min-w-0 flex-1">
               <span className="text-xs sm:text-sm font-bold text-slate-200 truncate flex items-center gap-1">
-                Anjali Rao
+                {user?.fullName}
               </span>
               <span className="text-xs text-slate-400 truncate font-mono">
-                Territory Rep • Delhi NCR
+                {ROLE_LABELS[user?.role] || user?.role} • {user?.orgName}
               </span>
             </div>
+          )}
+
+          {!isSidebarCollapsed && (
+            <button
+              type="button"
+              onClick={() => dispatch(logout())}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-300 hover:bg-slate-800 transition shrink-0 cursor-pointer"
+              title="Log out"
+              aria-label="Log out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           )}
 
           {/* Desktop Collapse Toggle */}

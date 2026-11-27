@@ -1,13 +1,15 @@
 from dataclasses import dataclass
 
 from fastapi import Depends, HTTPException, Query
-from sqlalchemy import select
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.core import config
+from app.core.security import AuthNotConfigured, InvalidToken, decode_access_token
 from app.database.database import DatabaseNotConfigured, get_db
-from app.models import Organization, User
+from app.models import User
 from app.schemas.common import MAX_PAGE_SIZE
+
+bearer = HTTPBearer(auto_error=False)
 
 
 def db_session():
@@ -21,25 +23,41 @@ def db_session():
 class RequestContext:
     org_id: int
     user_id: int
+    role: str
+
+    @property
+    def is_manager(self) -> bool:
+        return self.role == "manager"
 
 
-def get_context(db: Session = Depends(db_session)) -> RequestContext:
-    """Org/user for the request. Replace with the authenticated user once auth exists."""
-    org = db.scalar(select(Organization).where(Organization.slug == config.DEMO_ORG_SLUG))
-    if org is None:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Organization '{config.DEMO_ORG_SLUG}' not found. Run: python seed.py",
-        )
-    query = select(User).where(User.org_id == org.id, User.is_active.is_(True))
-    if config.DEMO_USER_EMAIL:
-        query = query.where(User.email == config.DEMO_USER_EMAIL)
-    else:
-        query = query.where(User.role == "rep").order_by(User.id)
-    user = db.scalars(query.limit(1)).first()
-    if user is None:
-        raise HTTPException(status_code=503, detail="No active user found for the organization")
-    return RequestContext(org_id=org.id, user_id=user.id)
+def _unauthorized(message: str) -> HTTPException:
+    return HTTPException(status_code=401, detail=message, headers={"WWW-Authenticate": "Bearer"})
+
+
+def get_context(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+    db: Session = Depends(db_session),
+) -> RequestContext:
+    """Org/user/role of the authenticated caller, read fresh from the DB on every request."""
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise _unauthorized("Not authenticated")
+    try:
+        payload = decode_access_token(credentials.credentials)
+    except AuthNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=f"Authentication unavailable: {exc}")
+    except InvalidToken:
+        raise _unauthorized("Invalid or expired token")
+
+    user = db.get(User, int(payload["sub"]))
+    if user is None or not user.is_active or user.org_id != payload["org"]:
+        raise _unauthorized("Invalid or expired token")
+    return RequestContext(org_id=user.org_id, user_id=user.id, role=user.role)
+
+
+def require_manager(ctx: RequestContext = Depends(get_context)) -> RequestContext:
+    if not ctx.is_manager:
+        raise HTTPException(status_code=403, detail="Manager role required")
+    return ctx
 
 
 @dataclass(frozen=True)
