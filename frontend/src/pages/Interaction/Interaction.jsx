@@ -182,8 +182,8 @@ export default function Interaction() {
       />
 
       {/* VISUAL WORKFLOW STEP BAR */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 card-shadow p-3.5 sm:p-4 overflow-x-auto custom-scrollbar">
-        <div className="flex items-center justify-between min-w-[620px] gap-2">
+      <div className="bg-white rounded-2xl border border-slate-200/90 card-shadow p-3.5 sm:p-4">
+        <div className="grid grid-cols-2 gap-3 md:flex md:items-center md:justify-between md:gap-2">
           <div className="flex items-center gap-3">
             <span className="w-7 h-7 rounded-xl bg-slate-900 text-white font-mono text-xs font-bold flex items-center justify-center shadow-xs">
               01
@@ -194,7 +194,7 @@ export default function Interaction() {
             </div>
           </div>
 
-          <span className="text-slate-300 font-mono text-xs">━━━━━━━━</span>
+          <span className="hidden md:inline text-slate-300 font-mono text-xs">━━━━━━━━</span>
 
           <div className="flex items-center gap-3">
             <span className="w-7 h-7 rounded-xl bg-slate-900 text-white font-mono text-xs font-bold flex items-center justify-center shadow-xs">
@@ -206,7 +206,7 @@ export default function Interaction() {
             </div>
           </div>
 
-          <span className="text-slate-300 font-mono text-xs">━━━━━━━━</span>
+          <span className="hidden md:inline text-slate-300 font-mono text-xs">━━━━━━━━</span>
 
           <div className="flex items-center gap-3">
             <span className="w-7 h-7 rounded-xl bg-slate-900 text-white font-mono text-xs font-bold flex items-center justify-center shadow-xs">
@@ -218,7 +218,7 @@ export default function Interaction() {
             </div>
           </div>
 
-          <span className="text-slate-300 font-mono text-xs">━━━━━━━━</span>
+          <span className="hidden md:inline text-slate-300 font-mono text-xs">━━━━━━━━</span>
 
           <div className="flex items-center gap-3">
             <span className="w-7 h-7 rounded-xl bg-teal-500 text-slate-950 font-mono text-xs font-bold flex items-center justify-center shadow-xs animate-pulse">

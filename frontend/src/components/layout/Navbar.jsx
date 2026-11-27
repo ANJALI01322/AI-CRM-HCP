@@ -99,13 +99,13 @@ export default function Navbar() {
     <>
       <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
         {/* Main Bar */}
-        <div className="h-16 px-4 sm:px-6 flex items-center justify-between gap-3 sm:gap-4">
+        <div className="h-16 px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4">
           {/* Left: Mobile Menu & Global Search Bar */}
-          <div className="flex items-center gap-3 flex-1 max-w-lg">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 max-w-lg">
             <button
               type="button"
               onClick={() => dispatch(toggleMobileSidebar())}
-              className="lg:hidden p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+              className="lg:hidden shrink-0 p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
               aria-label="Toggle navigation"
             >
               <Menu className="w-5 h-5" />
@@ -115,12 +115,14 @@ export default function Navbar() {
             <button
               type="button"
               onClick={() => setIsCommandOpen(true)}
-              className="w-full flex items-center justify-between gap-2.5 bg-slate-50 hover:bg-slate-100/90 border border-slate-200/90 rounded-xl px-3.5 py-2 transition text-left cursor-pointer group shadow-2xs"
+              aria-label="Search"
+              className="w-full min-w-0 flex items-center justify-between gap-2.5 bg-slate-50 hover:bg-slate-100/90 border border-slate-200/90 rounded-xl px-3.5 py-2 transition text-left cursor-pointer group shadow-2xs"
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <Search className="w-4 h-4 text-slate-400 group-hover:text-slate-700 shrink-0 transition" />
                 <span className="text-xs sm:text-sm text-slate-400 group-hover:text-slate-700 truncate font-medium">
-                  Search doctors, organizations, products, signals...
+                  <span className="sm:hidden">Search...</span>
+                  <span className="hidden sm:inline">Search doctors, organizations, products, signals...</span>
                 </span>
               </div>
               <span className="hidden sm:inline-flex items-center gap-1 text-xs font-mono font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs">
@@ -130,7 +132,7 @@ export default function Navbar() {
           </div>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-2.5 sm:gap-3.5">
+          <div className="flex items-center gap-1.5 sm:gap-3.5 shrink-0">
             {/* AI Intelligence Engine Status */}
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/90 border border-slate-200 text-xs font-mono font-semibold text-slate-700 shadow-2xs">
               <span className={`w-2 h-2 rounded-full animate-pulse ${aiOnline ? "bg-teal-500" : "bg-rose-500"}`} />
@@ -139,15 +141,18 @@ export default function Navbar() {
             </div>
 
             {/* Quick Log Action */}
-            <Button
-              variant="primary"
-              size="sm"
-              icon={Plus}
-              onClick={() => navigate("/interaction")}
-              className="hidden sm:inline-flex shadow-2xs font-semibold cursor-pointer"
-            >
-              Log Detailing
-            </Button>
+            {/* Wrapped so "hidden" isn't overridden by the Button's own inline-flex on phones */}
+            <div className="hidden sm:block">
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Plus}
+                onClick={() => navigate("/interaction")}
+                className="shadow-2xs font-semibold cursor-pointer"
+              >
+                Log Detailing
+              </Button>
+            </div>
 
             {/* Notifications Center */}
             <div className="relative" ref={notifRef}>
@@ -165,7 +170,7 @@ export default function Navbar() {
 
               {/* Notifications Dropdown */}
               {isNotifOpen && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl popover-shadow border border-slate-200/90 p-2.5 z-50 animate-fade-in text-xs sm:text-sm">
+                <div className="fixed left-2 right-2 top-[4.5rem] sm:absolute sm:left-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-96 bg-white rounded-2xl popover-shadow border border-slate-200/90 p-2.5 z-50 animate-fade-in text-xs sm:text-sm">
                   <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-slate-900 text-sm">

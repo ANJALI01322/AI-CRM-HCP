@@ -28,7 +28,7 @@ export default function RecentActivity({ onViewDetails }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 card-shadow p-5 flex flex-col h-full text-sm">
       {/* Header */}
-      <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
+      <div className="flex items-center justify-between gap-3 flex-wrap pb-3.5 border-b border-slate-100">
         <div className="flex items-center gap-2.5">
           <span className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-pulse" />
           <h3 className="font-bold text-slate-900 text-base tracking-tight flex items-center gap-2">
@@ -80,6 +80,14 @@ export default function RecentActivity({ onViewDetails }) {
             <div
               key={item.id}
               onClick={() => onViewDetails && onViewDetails(item)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onViewDetails && onViewDetails(item);
+                }
+              }}
               className="relative pl-6 pb-3 last:pb-0 group cursor-pointer"
             >
               {/* Vertical connector line */}
@@ -129,7 +137,7 @@ export default function RecentActivity({ onViewDetails }) {
                 </p>
 
                 {/* Products & Intent */}
-                <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-200/60 text-xs">
+                <div className="flex items-center justify-between gap-2 flex-wrap pt-1.5 border-t border-slate-200/60 text-xs">
                   <div className="flex items-center gap-1.5 flex-wrap text-slate-500">
                     <span className="font-medium text-slate-600">Product:</span>
                     {(item.products || []).map((p, pIdx) => (
@@ -143,10 +151,19 @@ export default function RecentActivity({ onViewDetails }) {
                   </div>
 
                   {item.aiSummary?.followUpAction && (
-                    <span className="text-teal-800 font-semibold flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewDetails && onViewDetails(item);
+                      }}
+                      className="text-teal-800 font-semibold flex items-center gap-1.5 shrink-0 px-2 py-1 -my-1 rounded-lg hover:bg-teal-50 active:bg-teal-100 cursor-pointer"
+                      aria-label={`View follow-up for ${item.doctorName}`}
+                    >
                       <Sparkles className="w-3.5 h-3.5 text-teal-600" />
                       Follow-up pending
-                    </span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
                   )}
                 </div>
               </div>

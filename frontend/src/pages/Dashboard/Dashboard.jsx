@@ -501,16 +501,32 @@ export default function Dashboard() {
           title={`Detailing Log: ${selectedActivity.doctorName}`}
           subtitle={`${selectedActivity.hospital} • ${selectedActivity.date}`}
           footer={
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => {
-                logForHCP(selectedActivity.hcpId);
-                setSelectedActivity(null);
-              }}
-            >
-              Log New Detailing for this Doctor
-            </Button>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto">
+              {(selectedActivity.followUpDate || selectedActivity.aiSummary?.followUpAction) && (
+                <Button
+                  variant="secondary"
+                  size="md"
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    setSelectedActivity(null);
+                    navigate("/follow-ups");
+                  }}
+                >
+                  Open Follow-ups
+                </Button>
+              )}
+              <Button
+                variant="primary"
+                size="md"
+                className="w-full sm:w-auto"
+                onClick={() => {
+                  logForHCP(selectedActivity.hcpId);
+                  setSelectedActivity(null);
+                }}
+              >
+                Log New Detailing for this Doctor
+              </Button>
+            </div>
           }
         >
           <div className="space-y-4 text-sm">
@@ -543,6 +559,11 @@ export default function Dashboard() {
                 <p className="text-teal-950 leading-relaxed font-semibold text-sm">
                   {selectedActivity.aiSummary.followUpAction}
                 </p>
+                {selectedActivity.followUpDate && (
+                  <p className="text-xs text-teal-800 mt-1.5 font-mono">
+                    Due: {selectedActivity.followUpDate}
+                  </p>
+                )}
               </div>
             )}
 

@@ -359,20 +359,21 @@ export default function Chat() {
         </div>
 
         {/* Input Bar */}
-        <div className="p-4 bg-white border-t border-slate-200">
+        <div className="p-3 sm:p-4 bg-white border-t border-slate-200">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSendMessage();
             }}
-            className="flex items-center gap-3"
+            className="flex items-center gap-2 sm:gap-3"
           >
             <input
               type="text"
               placeholder="Ask about HCPs, interactions, follow-ups, or territory priorities..."
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              className="flex-1 text-sm px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition shadow-2xs placeholder:text-slate-400 font-medium"
+              aria-label="Ask the AI Analyst"
+              className="flex-1 min-w-0 text-sm px-3 sm:px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition shadow-2xs placeholder:text-slate-400 font-medium"
             />
             <Button
               type="submit"
@@ -380,9 +381,10 @@ export default function Chat() {
               size="lg"
               icon={Send}
               disabled={!inputText.trim() || isLoading}
-              className="text-sm font-bold shadow-xs px-5 cursor-pointer"
+              className="text-sm font-bold shadow-xs px-3 sm:px-5 cursor-pointer shrink-0"
+              aria-label="Analyze"
             >
-              Analyze
+              <span className="hidden sm:inline">Analyze</span>
             </Button>
           </form>
         </div>
