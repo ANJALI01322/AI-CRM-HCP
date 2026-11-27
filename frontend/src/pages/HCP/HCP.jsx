@@ -35,7 +35,7 @@ import HCPCard from "../../components/hcp/HCPCard";
 import HCPDetailDrawer from "../../components/hcp/HCPDetailDrawer";
 import AddHCPModal from "../../components/hcp/AddHCPModal";
 import EditHCPModal from "../../components/hcp/EditHCPModal";
-import { SPECIALTIES, HOSPITALS } from "../../constants/mockData";
+import { SPECIALTIES } from "../../constants/options";
 import toast from "react-hot-toast";
 
 export default function HCP() {
@@ -60,6 +60,10 @@ export default function HCP() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingHCP, setEditingHCP] = useState(null);
   const [deletingHCP, setDeletingHCP] = useState(null);
+
+  // Filter options come from the user's own HCPs (plus the standard specialty list).
+  const specialtyOptions = [...new Set([...SPECIALTIES, ...hcps.map((h) => h.specialty)])].sort();
+  const hospitalOptions = [...new Set(hcps.map((h) => h.hospital))].sort();
 
   // Filter and Search Logic
   const filteredHCPs = hcps.filter((doctor) => {
@@ -110,7 +114,7 @@ export default function HCP() {
         doctorName: doctor.name,
         hospital: doctor.hospital,
         specialty: doctor.specialty,
-        products: doctor.productsOfInterest || ["CardioPlus 50mg"],
+        products: doctor.productsOfInterest || [],
       })
     );
     navigate("/interaction");
@@ -139,7 +143,7 @@ export default function HCP() {
     const rows = filteredHCPs
       .map(
         (d) =>
-          `"${d.name}","${d.qualification}","${d.specialty}","${d.hospital}","${d.city}","${d.tier}","${d.priority}","${d.status}","${d.lastVisit}"`
+          `"${d.name}","${d.qualification}","${d.specialty}","${d.hospital}","${d.city}","${d.tier}","${d.priority}","${d.status}","${d.lastVisit || ""}"`
       )
       .join("\n");
     const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
@@ -165,7 +169,7 @@ export default function HCP() {
       {/* Header */}
       <PageHeader
         title="HCP Intelligence"
-        subtitle="8 Doctors Under Management • Clinical directory, relationship pulse tracking, and prescribing momentum."
+        subtitle="Clinical directory, relationship health tracking, and recent engagement."
         badge={`${hcps.length} Doctors Under Management`}
         breadcrumbs={[{ label: "OmniHealth OS", path: "/" }, { label: "HCP Intelligence" }]}
         actions={
@@ -393,7 +397,7 @@ export default function HCP() {
               className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 shadow-2xs"
             >
               <option value="All">All Specialties</option>
-              {SPECIALTIES.map((s) => (
+              {specialtyOptions.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
@@ -443,7 +447,7 @@ export default function HCP() {
               className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 truncate shadow-2xs"
             >
               <option value="All">All Hospitals</option>
-              {HOSPITALS.map((h) => (
+              {hospitalOptions.map((h) => (
                 <option key={h} value={h}>
                   {h}
                 </option>

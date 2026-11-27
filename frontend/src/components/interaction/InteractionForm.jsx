@@ -1,54 +1,25 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import {
-  Sparkles,
-  Mic,
-  FileText,
-  User,
-  Calendar,
-  Building,
-} from "lucide-react";
+import { Sparkles, Mic, FileText } from "lucide-react";
 import { updateActiveDraft } from "../../redux/slices/interactionSlice";
-import { PRODUCTS_CATALOG } from "../../constants/mockData";
 import Button from "../common/Button";
 import toast from "react-hot-toast";
 
-const QUICK_TEMPLATES = [
-  {
-    title: "CardioPlus 50mg Trial Detailing",
-    doctor: "Dr. Rahul Sharma",
-    hospital: "Apollo Hospital",
-    specialty: "Cardiology",
-    products: ["CardioPlus 50mg", "GlucoCare Duo"],
-    notes:
-      "Met Dr. Rahul Sharma at Apollo Hospital. Detailed the Phase-3 REDUCE-HF clinical trial outcomes highlighting 24% reduction in CV re-hospitalizations. The doctor was very positive about patient tolerability and asked for 15 trial starter packs. Also invited us to co-sponsor the upcoming hospital CME next month.",
-  },
-  {
-    title: "NeuroGuard XR Objection Handling",
-    doctor: "Dr. Priya Mehta",
-    hospital: "Fortis Memorial Research Institute",
-    specialty: "Neurology",
-    products: ["NeuroGuard XR"],
-    notes:
-      "Discussed NeuroGuard XR once-daily bedtime dosing advantages for diabetic neuropathy. Dr. Mehta raised concerns regarding patient price sensitivity compared to immediate-release generic formulations. Agreed to deliver pharmacoeconomic savings chart and 5 sample kits by next Tuesday.",
-  },
-  {
-    title: "OncoShield 250 Formulary Review",
-    doctor: "Dr. Rajesh Kulkarni",
-    hospital: "AIIMS (All India Institute of Medical Sciences)",
-    specialty: "Oncology",
-    products: ["OncoShield 250"],
-    notes:
-      "Presented 5-year overall survival Kaplan-Meier data for OncoShield in EGFR-mutant NSCLC. Dr. Kulkarni confirmed that our drug is being scheduled for the institutional Pharmacy & Therapeutics (P&T) committee review on July 20. Requested comprehensive technical dossier by Friday.",
-  },
-];
+const SpeechRecognition =
+  typeof window !== "undefined" ? window.SpeechRecognition || window.webkitSpeechRecognition : null;
 
 export default function InteractionForm({ onGenerateAI, isLoading }) {
   const dispatch = useDispatch();
   const hcps = useSelector((state) => state.hcp.items);
   const draft = useSelector((state) => state.interaction.activeDraft);
+  const products = useSelector((state) => state.catalog.products);
 
   const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef(null);
+  const notesRef = useRef(draft.rawNotes || "");
+  notesRef.current = draft.rawNotes || "";
+
+  useEffect(() => () => recognitionRef.current?.abort(), []);
 
   const handleDoctorSelect = (e) => {
     const selectedName = e.target.value;
@@ -59,25 +30,12 @@ export default function InteractionForm({ onGenerateAI, isLoading }) {
           doctorName: foundDoc.name,
           hospital: foundDoc.hospital,
           specialty: foundDoc.specialty,
-          products: foundDoc.productsOfInterest || ["CardioPlus 50mg"],
+          products: foundDoc.productsOfInterest || [],
         })
       );
     } else {
       dispatch(updateActiveDraft({ doctorName: selectedName }));
     }
-  };
-
-  const handleApplyTemplate = (tpl) => {
-    dispatch(
-      updateActiveDraft({
-        doctorName: tpl.doctor,
-        hospital: tpl.hospital,
-        specialty: tpl.specialty,
-        products: tpl.products,
-        rawNotes: tpl.notes,
-      })
-    );
-    toast.success(`Loaded detailing draft: "${tpl.title}"`);
   };
 
   const toggleProduct = (prodName) => {
@@ -89,21 +47,36 @@ export default function InteractionForm({ onGenerateAI, isLoading }) {
     dispatch(updateActiveDraft({ products: updated }));
   };
 
-  const handleVoiceSimulate = () => {
+  // Real browser speech-to-text (Web Speech API); the button is hidden where unsupported.
+  const handleDictation = () => {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = navigator.language || "en-US";
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.onresult = (event) => {
+      const text = Array.from(event.results)
+        .slice(event.resultIndex)
+        .map((r) => r[0].transcript.trim())
+        .join(" ")
+        .trim();
+      if (text) {
+        const current = notesRef.current;
+        dispatch(updateActiveDraft({ rawNotes: current ? `${current} ${text}` : text }));
+      }
+    };
+    recognition.onerror = (event) => {
+      if (event.error !== "no-speech" && event.error !== "aborted") {
+        toast.error(`Voice dictation error: ${event.error}`);
+      }
+    };
+    recognition.onend = () => setIsRecording(false);
+    recognitionRef.current = recognition;
     setIsRecording(true);
-    toast("Listening to rep voice dictation...", { icon: "🎙️" });
-    setTimeout(() => {
-      setIsRecording(false);
-      dispatch(
-        updateActiveDraft({
-          rawNotes:
-            draft.rawNotes +
-            (draft.rawNotes ? "\n" : "") +
-            "Doctor expressed keen interest in the once-daily formulation. Requested 10 patient starter packs and follow-up clinical brief by next Monday.",
-        })
-      );
-      toast.success("Voice note transcribed!");
-    }, 1500);
+    recognition.start();
   };
 
   return (
@@ -127,33 +100,6 @@ export default function InteractionForm({ onGenerateAI, isLoading }) {
       </div>
 
       <div className="space-y-4 flex-1">
-        {/* Rapid Scenarios */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500">
-              Rapid Clinical Scenarios
-            </label>
-            <span className="text-xs text-teal-700 font-semibold font-mono">1-Click Pre-fill</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {QUICK_TEMPLATES.map((tpl, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => handleApplyTemplate(tpl)}
-                className="p-3 text-left rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100/90 hover:border-slate-300 transition text-xs font-medium text-slate-700 truncate cursor-pointer shadow-2xs group"
-              >
-                <div className="font-bold text-slate-900 truncate group-hover:text-teal-800 transition">
-                  {tpl.title}
-                </div>
-                <div className="text-xs text-slate-500 truncate mt-1 font-mono">
-                  {tpl.doctor}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Doctor & Hospital Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <div>
@@ -180,7 +126,7 @@ export default function InteractionForm({ onGenerateAI, isLoading }) {
             </label>
             <input
               type="text"
-              placeholder="e.g. Apollo Hospital"
+              placeholder="Hospital or clinic name"
               value={draft.hospital || ""}
               onChange={(e) =>
                 dispatch(updateActiveDraft({ hospital: e.target.value }))
@@ -231,7 +177,7 @@ export default function InteractionForm({ onGenerateAI, isLoading }) {
             Products Discussed (Multi-Select)
           </label>
           <div className="flex flex-wrap gap-1.5">
-            {PRODUCTS_CATALOG.map((p) => {
+            {products.map((p) => {
               const isSelected = (draft.products || []).includes(p.name);
               return (
                 <button
@@ -258,15 +204,16 @@ export default function InteractionForm({ onGenerateAI, isLoading }) {
             <label className="text-xs font-bold text-slate-700 uppercase font-mono tracking-wider">
               Detailing Notes & Doctor Feedback <span className="text-rose-500">*</span>
             </label>
-            <button
-              type="button"
-              onClick={handleVoiceSimulate}
-              disabled={isRecording}
-              className="text-xs text-teal-700 hover:text-teal-800 font-semibold flex items-center gap-1.5 cursor-pointer bg-teal-50 hover:bg-teal-100/80 px-2.5 py-1 rounded-lg border border-teal-200/70 transition"
-            >
-              <Mic className={`w-3.5 h-3.5 ${isRecording ? "text-rose-500 animate-pulse" : ""}`} />
-              {isRecording ? "Transcribing..." : "Simulate Voice Dictation"}
-            </button>
+            {SpeechRecognition && (
+              <button
+                type="button"
+                onClick={handleDictation}
+                className="text-xs text-teal-700 hover:text-teal-800 font-semibold flex items-center gap-1.5 cursor-pointer bg-teal-50 hover:bg-teal-100/80 px-2.5 py-1 rounded-lg border border-teal-200/70 transition"
+              >
+                <Mic className={`w-3.5 h-3.5 ${isRecording ? "text-rose-500 animate-pulse" : ""}`} />
+                {isRecording ? "Listening… tap to stop" : "Voice Dictation"}
+              </button>
+            )}
           </div>
           <textarea
             rows="5"

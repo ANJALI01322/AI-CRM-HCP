@@ -32,7 +32,7 @@ const HCP_FIELDS = [
 const toApiHCP = (hcp) =>
   Object.fromEntries(HCP_FIELDS.filter((k) => hcp[k] !== undefined).map((k) => [k, hcp[k]]));
 
-const fromApiHCP = (h) => ({ ...h, lastVisit: h.lastVisit || "Never" });
+const fromApiHCP = (h) => h;
 
 export const listHCPs = async () => (await fetchAll("/hcps")).map(fromApiHCP);
 
@@ -86,3 +86,18 @@ export const deleteInteraction = async (id) => {
   await api.delete(`/interactions/${id}`);
   return id;
 };
+
+// ---- Follow-ups ----
+
+export const listFollowUps = async (status) => {
+  const items = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data } = await api.get("/follow-ups", {
+      params: { limit: PAGE_SIZE, offset, ...(status ? { status } : {}) },
+    });
+    items.push(...data.items);
+    if (data.items.length === 0 || items.length >= data.total) return items;
+  }
+};
+
+export const updateFollowUp = async (id, patch) => (await api.patch(`/follow-ups/${id}`, patch)).data;

@@ -21,6 +21,7 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
 } from "../../redux/slices/uiSlice";
+import { dueLabel, pluralize, shortDate } from "../../utils/format";
 import Button from "../common/Button";
 import HCPAvatar from "../common/HCPAvatar";
 import CommandPalette from "../common/CommandPalette";
@@ -30,14 +31,29 @@ export default function Navbar() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const apiHealth = useApiHealth();
+  const aiOnline = apiHealth.label.startsWith("Live") && !apiHealth.label.includes("AI offline");
 
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifFilter, setNotifFilter] = useState("all"); // 'all' | 'unread' | 'alerts'
   const notifRef = useRef(null);
 
-  const notifications = useSelector((state) => state.ui.notifications);
+  const sessionNotifications = useSelector((state) => state.ui.notifications);
+  const readAlertIds = useSelector((state) => state.ui.readAlertIds);
   const user = useSelector((state) => state.auth.user);
+  const stats = useSelector((state) => state.dashboard.stats);
+
+  // Alerts come from live follow-up data; session notifications come from actions taken in this session.
+  const followUpAlerts = (stats?.dueFollowUps || []).map((f) => ({
+    id: `fu-${f.id}`,
+    title: f.daysOverdue > 0 ? "Overdue Follow-up" : "Follow-up Due Today",
+    description: `${f.hcp}: ${f.action}`,
+    time: dueLabel(f.daysOverdue, f.dueDate, stats.today),
+    type: "alert",
+    read: readAlertIds.includes(`fu-${f.id}`),
+    path: "/",
+  }));
+  const notifications = [...followUpAlerts, ...sessionNotifications];
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
 
   // Click outside to close notification panel
@@ -64,13 +80,7 @@ export default function Navbar() {
   const handleNotificationClick = (notif) => {
     dispatch(markNotificationAsRead(notif.id));
     setIsNotifOpen(false);
-    if (notif.title.includes("Follow-up") || notif.title.includes("Rahul Sharma")) {
-      navigate("/hcp");
-    } else if (notif.type === "ai") {
-      navigate("/chat");
-    } else {
-      navigate("/hcp");
-    }
+    navigate(notif.path || (notif.type === "ai" ? "/chat" : "/hcp"));
   };
 
   return (
@@ -111,9 +121,9 @@ export default function Navbar() {
           <div className="flex items-center gap-2.5 sm:gap-3.5">
             {/* AI Intelligence Engine Status */}
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/90 border border-slate-200 text-xs font-mono font-semibold text-slate-700 shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
+              <span className={`w-2 h-2 rounded-full animate-pulse ${aiOnline ? "bg-teal-500" : "bg-rose-500"}`} />
               <span>Groq Intelligence</span>
-              <span className="text-slate-400 font-normal">• Live</span>
+              <span className="text-slate-400 font-normal">• {aiOnline ? "Live" : "Offline"}</span>
             </div>
 
             {/* Quick Log Action */}
@@ -158,7 +168,7 @@ export default function Navbar() {
                     {unreadNotifsCount > 0 && (
                       <button
                         type="button"
-                        onClick={() => dispatch(markAllNotificationsAsRead())}
+                        onClick={() => dispatch(markAllNotificationsAsRead(followUpAlerts.map((a) => a.id)))}
                         className="text-[11px] text-teal-700 hover:text-teal-800 font-medium cursor-pointer"
                       >
                         Mark all read
@@ -256,13 +266,15 @@ export default function Navbar() {
             <span className="text-slate-300">/</span>
             <span>{user?.role === "manager" ? "Organization View" : "My Territory"}</span>
             <span className="text-slate-300">/</span>
-            <span className="font-mono text-slate-600">Q3 2026 • Week 37</span>
+            <span className="font-mono text-slate-600">{shortDate(new Date())}</span>
           </div>
 
           <div className="flex items-center gap-3 shrink-0 font-mono text-[10px]">
-            <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 font-semibold">
-              3 Actions Required Today
-            </span>
+            {stats && stats.followUps.dueNow > 0 && (
+              <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 font-semibold">
+                {pluralize(stats.followUps.dueNow, "Action")} Required Today
+              </span>
+            )}
             <span className="text-slate-400 hidden sm:inline" title={apiHealth.detail}>
               Sync: {apiHealth.label}
             </span>

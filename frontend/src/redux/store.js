@@ -3,6 +3,7 @@ import hcpReducer from "./slices/hcpSlice";
 import interactionReducer from "./slices/interactionSlice";
 import dashboardReducer from "./slices/dashboardSlice";
 import uiReducer from "./slices/uiSlice";
+import catalogReducer from "./slices/catalogSlice";
 import authReducer, { logout } from "./slices/authSlice";
 import { onUnauthorized } from "../services/api";
 
@@ -12,6 +13,7 @@ const appReducer = combineReducers({
   interaction: interactionReducer,
   dashboard: dashboardReducer,
   ui: uiReducer,
+  catalog: catalogReducer,
 });
 
 // Logging out clears every slice so the next user never sees the previous user's data.

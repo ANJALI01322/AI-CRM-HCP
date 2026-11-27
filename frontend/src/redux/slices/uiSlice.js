@@ -1,10 +1,12 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { NOTIFICATIONS } from "../../constants/mockData";
 
 const initialState = {
   isSidebarCollapsed: false,
   isMobileSidebarOpen: false,
-  notifications: NOTIFICATIONS,
+  // Session notifications added by user actions (e.g. an interaction was logged).
+  // Follow-up alerts are derived from live data in the Navbar.
+  notifications: [],
+  readAlertIds: [],
   activeModal: null, // 'ADD_HCP' | 'EDIT_HCP' | 'GLOBAL_SEARCH' | null
   globalSearchOpen: false,
 };
@@ -34,14 +36,19 @@ export const uiSlice = createSlice({
     markNotificationAsRead: (state, action) => {
       const notif = state.notifications.find((n) => n.id === action.payload);
       if (notif) notif.read = true;
+      else if (!state.readAlertIds.includes(action.payload)) state.readAlertIds.push(action.payload);
     },
-    markAllNotificationsAsRead: (state) => {
+    /** payload: ids of the derived alerts currently shown. */
+    markAllNotificationsAsRead: (state, action) => {
       state.notifications.forEach((n) => (n.read = true));
+      for (const id of action.payload || []) {
+        if (!state.readAlertIds.includes(id)) state.readAlertIds.push(id);
+      }
     },
     addNotification: (state, action) => {
       state.notifications.unshift({
         id: `notif-${Date.now()}`,
-        time: "Just now",
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         read: false,
         ...action.payload,
       });

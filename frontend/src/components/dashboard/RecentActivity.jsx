@@ -102,7 +102,7 @@ export default function RecentActivity({ onViewDetails }) {
                       size="xs"
                     />
                     <span className="font-mono font-bold text-slate-900 text-xs">
-                      {item.time || "09:42"}
+                      {item.time}
                     </span>
                     <span className="font-bold text-slate-900 text-sm group-hover:text-teal-800 transition">
                       {item.doctorName}
@@ -132,7 +132,7 @@ export default function RecentActivity({ onViewDetails }) {
                 <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-200/60 text-xs">
                   <div className="flex items-center gap-1.5 flex-wrap text-slate-500">
                     <span className="font-medium text-slate-600">Product:</span>
-                    {(item.products || ["CardioPlus 50mg"]).map((p, pIdx) => (
+                    {(item.products || []).map((p, pIdx) => (
                       <span
                         key={pIdx}
                         className="bg-white px-2 py-0.5 rounded-md border border-slate-200 text-slate-800 font-semibold shadow-2xs"
@@ -154,7 +154,9 @@ export default function RecentActivity({ onViewDetails }) {
           ))
         ) : (
           <div className="p-8 text-center text-xs text-slate-400">
-            No recent interaction changes found matching filter.
+            {interactions.length === 0
+              ? "No interactions logged yet. Log your first detailing visit to see activity here."
+              : "No recent interaction changes found matching filter."}
           </div>
         )}
       </div>

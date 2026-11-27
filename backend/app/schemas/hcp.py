@@ -48,5 +48,14 @@ class HCPUpdate(HCPFields):
 class HCPOut(HCPCreate):
     id: int
     interaction_count: int = 0
+    # Computed from stored interactions and follow-ups (see services/dashboard.py).
+    health_label: str = "At Risk"
+    health_score: int = 0
+    days_since_last_visit: int | None = None
+    last_sentiment: str | None = None
+    interactions_last_30_days: int = 0
+    overdue_follow_ups: int = 0
+    next_follow_up_date: date | None = None
+    next_follow_up_action: str | None = None
     created_at: datetime
     updated_at: datetime

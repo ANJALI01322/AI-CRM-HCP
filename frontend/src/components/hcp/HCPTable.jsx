@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import Badge from "../common/Badge";
 import HCPAvatar from "../common/HCPAvatar";
+import { placeLabel, relationshipInfo } from "../../utils/hcpHealth";
 
 export default function HCPTable({
   hcps,
@@ -19,20 +20,6 @@ export default function HCPTable({
   onEdit,
   onDelete,
 }) {
-  // Helper for dynamic momentum and health badge
-  const getRelationshipInfo = (doc) => {
-    if (doc.priority === "High" && doc.status === "Active") {
-      return { health: "Strong", score: 92, momentum: "↑ 18%", trendType: "up", nextAction: "Deliver sample pack", barColor: "bg-emerald-500" };
-    }
-    if (doc.priority === "High" && doc.status === "Follow-up") {
-      return { health: "At Risk", score: 58, momentum: "↓ 14%", trendType: "down", nextAction: "Pricing objection review", barColor: "bg-rose-500" };
-    }
-    if (doc.status === "Follow-up") {
-      return { health: "Watch", score: 72, momentum: "→ 0%", trendType: "neutral", nextAction: "Schedule follow-up", barColor: "bg-amber-500" };
-    }
-    return { health: "Healthy", score: 84, momentum: "↑ 8%", trendType: "up", nextAction: "Routine clinical touch", barColor: "bg-teal-500" };
-  };
-
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 card-shadow overflow-hidden text-sm">
       <div className="overflow-x-auto custom-scrollbar">
@@ -43,14 +30,14 @@ export default function HCPTable({
               <th className="py-4 px-4">Specialty</th>
               <th className="py-4 px-4">Hospital & Territory</th>
               <th className="py-4 px-4">Relationship Health</th>
-              <th className="py-4 px-4">Momentum</th>
+              <th className="py-4 px-4">Activity (30d)</th>
               <th className="py-4 px-4">Last Touch / Next Action</th>
               <th className="py-4 px-5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
             {hcps.map((doctor) => {
-              const rel = getRelationshipInfo(doctor);
+              const rel = relationshipInfo(doctor);
 
               return (
                 <tr
@@ -98,7 +85,7 @@ export default function HCPTable({
                         {doctor.hospital}
                       </p>
                       <p className="text-xs text-slate-500 truncate mt-0.5 font-medium">
-                        {doctor.city}, {doctor.state}
+                        {placeLabel(doctor)}
                       </p>
                     </div>
                   </td>
@@ -111,7 +98,7 @@ export default function HCPTable({
                           {rel.health}
                         </Badge>
                         <span className="font-mono font-bold text-slate-900 text-xs tabular-nums">
-                          {rel.score}%
+                          {rel.score}/100
                         </span>
                       </div>
                       <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
@@ -134,14 +121,14 @@ export default function HCPTable({
                           : "text-slate-600"
                       }`}
                     >
-                      {rel.momentum}
+                      {rel.activity}
                     </span>
                   </td>
 
                   {/* Last Touch & Next Action */}
                   <td className="py-4 px-4">
                     <div className="text-slate-900 font-semibold font-mono text-xs">
-                      {doctor.lastVisit || "Recent"}
+                      {rel.lastTouch}
                     </div>
                     <div className="text-xs text-slate-500 truncate flex items-center gap-1 mt-0.5 max-w-[180px]">
                       <span className="text-teal-700 font-semibold font-mono">Next:</span> {rel.nextAction}

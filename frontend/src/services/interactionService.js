@@ -18,20 +18,8 @@ export const sendChat = async (message, history = []) => {
   return data;
 };
 
-/**
- * Fetches dashboard KPI stats from backend
- */
+/** Dashboard numbers computed server-side from the caller's scoped data. */
 export const getDashboardStats = async () => {
-  try {
-    const response = await api.get("/dashboard/stats");
-    return response.data;
-  } catch (error) {
-    console.warn("Dashboard stats fetch failed, using localized aggregate:", error);
-    return {
-      total_hcps: 248,
-      today_visits: 12,
-      interactions: 845,
-      followups: 31,
-    };
-  }
+  const { data } = await api.get("/dashboard/stats");
+  return data;
 };

@@ -17,7 +17,7 @@ const EMPTY_DRAFT = {
   hospital: "",
   specialty: "",
   visitType: "In-Person Detailing",
-  products: ["CardioPlus 50mg"],
+  products: [],
   rawNotes: "",
   followUpDate: "",
 };

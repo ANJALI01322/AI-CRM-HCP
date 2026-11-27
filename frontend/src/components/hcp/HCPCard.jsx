@@ -11,6 +11,7 @@ import {
 import Badge from "../common/Badge";
 import Button from "../common/Button";
 import HCPAvatar from "../common/HCPAvatar";
+import { placeLabel, relationshipInfo } from "../../utils/hcpHealth";
 
 export default function HCPCard({
   doctor,
@@ -19,20 +20,7 @@ export default function HCPCard({
   onEdit,
   onDelete,
 }) {
-  const getRelationshipInfo = (doc) => {
-    if (doc.priority === "High" && doc.status === "Active") {
-      return { health: "Strong", score: 92, momentum: "↑ 18%", trendType: "up", nextAction: "Deliver sample pack", barColor: "bg-emerald-500" };
-    }
-    if (doc.priority === "High" && doc.status === "Follow-up") {
-      return { health: "At Risk", score: 58, momentum: "↓ 14%", trendType: "down", nextAction: "Pricing objection review", barColor: "bg-rose-500" };
-    }
-    if (doc.status === "Follow-up") {
-      return { health: "Watch", score: 72, momentum: "→ 0%", trendType: "neutral", nextAction: "Schedule follow-up", barColor: "bg-amber-500" };
-    }
-    return { health: "Healthy", score: 84, momentum: "↑ 8%", trendType: "up", nextAction: "Routine clinical touch", barColor: "bg-teal-500" };
-  };
-
-  const rel = getRelationshipInfo(doctor);
+  const rel = relationshipInfo(doctor);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 card-shadow hover:card-shadow-hover hover:-translate-y-0.5 flex flex-col justify-between p-5 group relative text-sm transition-all duration-200">
@@ -78,7 +66,7 @@ export default function HCPCard({
                   : "text-slate-500"
               }`}
             >
-              {rel.momentum}
+              {rel.activity}
             </span>
           </div>
         </div>
@@ -87,7 +75,7 @@ export default function HCPCard({
         <div className="mt-3.5 p-2.5 rounded-xl bg-slate-50/90 border border-slate-100 space-y-1.5">
           <div className="flex items-center justify-between text-xs">
             <span className="text-[11px] font-mono font-bold text-slate-500 uppercase tracking-wider">Relationship Health</span>
-            <span className="font-mono font-bold text-slate-900 text-xs tabular-nums">{rel.score}%</span>
+            <span className="font-mono font-bold text-slate-900 text-xs tabular-nums">{rel.score}/100</span>
           </div>
           <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
             <div
@@ -102,9 +90,11 @@ export default function HCPCard({
           <Badge variant={doctor.specialty} size="xs">
             {doctor.specialty}
           </Badge>
-          <span className="text-xs font-mono font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
-            {doctor.prescribingPotential || "High Vol"}
-          </span>
+          {doctor.prescribingPotential && (
+            <span className="text-xs font-mono font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+              {doctor.prescribingPotential}
+            </span>
+          )}
         </div>
 
         {/* Info list */}
@@ -116,11 +106,11 @@ export default function HCPCard({
 
           <div className="flex items-center gap-2 truncate">
             <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span className="truncate text-slate-500">{doctor.city}, {doctor.state}</span>
+            <span className="truncate text-slate-500">{placeLabel(doctor)}</span>
           </div>
 
           <div className="flex items-center justify-between text-xs pt-1">
-            <span className="text-slate-500">Last Touch: <strong className="text-slate-900 font-mono">{doctor.lastVisit}</strong></span>
+            <span className="text-slate-500">Last Touch: <strong className="text-slate-900 font-mono">{rel.lastTouch}</strong></span>
           </div>
 
           <div className="p-2 bg-slate-50 rounded-lg border border-slate-100 text-xs text-slate-700 truncate">

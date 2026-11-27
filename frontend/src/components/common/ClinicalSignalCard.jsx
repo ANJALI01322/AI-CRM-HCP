@@ -21,7 +21,7 @@ export default function ClinicalSignalCard({
   why,
   aiReasoning,
   actionLabel = "Execute Action",
-  confidence = 94,
+  confidence,
   onAction,
   onViewHCP,
 }) {
@@ -54,7 +54,7 @@ export default function ClinicalSignalCard({
       confidenceColor: "bg-amber-500",
     },
     followup: {
-      badge: "Action Due Today",
+      badge: "Follow-up Due",
       badgeVariant: "Healthy",
       borderAccent: "border-l-4 border-l-teal-500",
       accentBg: "bg-teal-50 text-teal-700",
@@ -83,7 +83,7 @@ export default function ClinicalSignalCard({
             </Badge>
           </div>
 
-          {/* Visual Confidence Progress Bar */}
+          {confidence !== undefined && (
           <div className="flex items-center gap-2 text-xs font-mono font-semibold text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/80">
             <span className="text-[11px] text-slate-400">Confidence</span>
             <div className="w-16 bg-slate-200 rounded-full h-1.5 overflow-hidden">
@@ -94,6 +94,7 @@ export default function ClinicalSignalCard({
             </div>
             <span className="text-slate-900 font-bold">{confidence}%</span>
           </div>
+          )}
         </div>
 
         {/* Doctor Identity */}
@@ -122,7 +123,7 @@ export default function ClinicalSignalCard({
 
           <div className="p-4 rounded-xl bg-slate-950 text-slate-200 space-y-1.5 border border-slate-800 shadow-xs">
             <span className="text-xs font-bold uppercase tracking-wider text-teal-300 font-mono flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-teal-400" /> AI Recommended Action:
+              <Sparkles className="w-3.5 h-3.5 text-teal-400" /> Recommended Action:
             </span>
             <p className="text-slate-200 leading-relaxed text-xs sm:text-sm font-medium">
               {aiReasoning}

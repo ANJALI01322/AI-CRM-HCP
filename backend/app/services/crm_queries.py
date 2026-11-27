@@ -55,6 +55,8 @@ def _follow_up_dict(f: FollowUp, hcp: HCP, clock: Clock) -> dict:
         "id": f.id,
         "hcp": hcp.name,
         "hcp_id": hcp.id,
+        "hospital": hcp.hospital,
+        "specialty": hcp.specialty,
         "due_date": f.due_date.isoformat(),
         "days_overdue": max(0, (clock.today - f.due_date).days),
         "action": f.action,

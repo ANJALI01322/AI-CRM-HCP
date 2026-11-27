@@ -24,6 +24,8 @@ import Drawer from "../common/Drawer";
 import Badge from "../common/Badge";
 import Button from "../common/Button";
 import HCPAvatar from "../common/HCPAvatar";
+import { placeLabel, relationshipInfo } from "../../utils/hcpHealth";
+import { monthDay, pluralize } from "../../utils/format";
 
 export default function HCPDetailDrawer({
   isOpen,
@@ -45,20 +47,29 @@ export default function HCPDetailDrawer({
       item.hcpId === doctor.id
   );
 
-  const getRelationshipInfo = (doc) => {
-    if (doc.priority === "High" && doc.status === "Active") {
-      return { health: "Strong", momentum: "↑ 18%", trendType: "up", score: 92 };
-    }
-    if (doc.priority === "High" && doc.status === "Follow-up") {
-      return { health: "At Risk", momentum: "↓ 14%", trendType: "down", score: 64 };
-    }
-    if (doc.status === "Follow-up") {
-      return { health: "Watch", momentum: "→ 0%", trendType: "neutral", score: 72 };
-    }
-    return { health: "Healthy", momentum: "↑ 8%", trendType: "up", score: 84 };
-  };
+  const rel = relationshipInfo(doctor);
 
-  const rel = getRelationshipInfo(doctor);
+  // Product adoption derived from this doctor's logged interactions (no invented stages or percentages).
+  const productStats = new Map();
+  for (const name of doctor.productsOfInterest || [])
+    productStats.set(name, { product: name, count: 0, last: null, sentiment: null });
+  for (const int of doctorInteractions) {
+    for (const name of int.products || []) {
+      const row = productStats.get(name) || { product: name, count: 0, last: null, sentiment: null };
+      row.count += 1;
+      if (!row.last || int.date > row.last) {
+        row.last = int.date;
+        row.sentiment = int.sentiment;
+      }
+      productStats.set(name, row);
+    }
+  }
+  const productRows = [...productStats.values()].sort((x, y) => y.count - x.count);
+
+  const objections = doctorInteractions
+    .filter((i) => i.objections)
+    .map((i) => ({ date: i.date, text: i.objections }));
+  const latest = doctorInteractions[0];
 
   return (
     <Drawer
@@ -126,19 +137,15 @@ export default function HCPDetailDrawer({
 
             {/* Relationship Pulse Score Box */}
             <div className="text-right shrink-0 bg-slate-950/90 p-3 rounded-xl border border-slate-800 font-mono shadow-inner">
-              <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Momentum</span>
+              <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Activity (30d)</span>
               <p
                 className={`text-base font-extrabold mt-0.5 ${
-                  rel.trendType === "up"
-                    ? "text-teal-400"
-                    : rel.trendType === "down"
-                    ? "text-rose-400"
-                    : "text-slate-300"
+                  rel.trendType === "up" ? "text-teal-400" : "text-slate-300"
                 }`}
               >
-                {rel.momentum}
+                {pluralize(doctor.interactionsLast30Days || 0, "visit")}
               </p>
-              <span className="text-xs text-slate-400 font-medium">Score: {rel.score}/100</span>
+              <span className="text-xs text-slate-400 font-medium">Health: {rel.score}/100</span>
             </div>
           </div>
 
@@ -146,15 +153,15 @@ export default function HCPDetailDrawer({
           <div className="grid grid-cols-3 gap-2.5 pt-3 border-t border-slate-800 text-xs font-mono text-slate-400">
             <div>
               <span>Last Touch:</span>{" "}
-              <strong className="text-slate-200 font-semibold">{doctor.lastVisit || "4 days ago"}</strong>
+              <strong className="text-slate-200 font-semibold">{rel.lastTouch}</strong>
             </div>
             <div>
-              <span>Potential:</span>{" "}
-              <strong className="text-teal-400 font-semibold">Top 10%</strong>
+              <span>Tier:</span>{" "}
+              <strong className="text-teal-400 font-semibold">{doctor.tier || "-"}</strong>
             </div>
             <div className="text-right">
               <span>Logs:</span>{" "}
-              <strong className="text-slate-200 font-semibold">{doctorInteractions.length} Sessions</strong>
+              <strong className="text-slate-200 font-semibold">{pluralize(doctorInteractions.length, "Session")}</strong>
             </div>
           </div>
         </div>
@@ -164,8 +171,8 @@ export default function HCPDetailDrawer({
           {[
             { id: "overview", label: "Overview & Logistics" },
             { id: "history", label: `Detailing History (${doctorInteractions.length})` },
-            { id: "products", label: "Product Adoption Matrix" },
-            { id: "ai_strategy", label: "AI Briefing & Strategy" },
+            { id: "products", label: "Products Discussed" },
+            { id: "ai_strategy", label: "CRM Briefing" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -194,7 +201,7 @@ export default function HCPDetailDrawer({
                   {doctor.specialty} Department
                 </p>
                 <p className="text-xs text-slate-500">
-                  {doctor.department || "Main Outpatient OPD"}
+                  {doctor.department || "Not recorded"}
                 </p>
               </div>
 
@@ -203,10 +210,10 @@ export default function HCPDetailDrawer({
                   Monthly Prescribing Potential
                 </p>
                 <p className="text-sm font-bold text-teal-800">
-                  {doctor.prescribingPotential || "High Potential (₹15L+/month)"}
+                  {doctor.prescribingPotential || "Not recorded"}
                 </p>
                 <p className="text-xs text-slate-500">
-                  Territory Priority: High Prescriber
+                  Priority: {doctor.priority}
                 </p>
               </div>
 
@@ -216,11 +223,11 @@ export default function HCPDetailDrawer({
                 </p>
                 <p className="text-xs text-slate-800 flex items-center gap-2 font-mono">
                   <Mail className="w-3.5 h-3.5 text-slate-400" />
-                  {doctor.email || "doctor@hospital.org"}
+                  {doctor.email || "Not recorded"}
                 </p>
                 <p className="text-xs text-slate-800 flex items-center gap-2 font-mono">
                   <Phone className="w-3.5 h-3.5 text-slate-400" />
-                  {doctor.phone || "+91 98000 00000"}
+                  {doctor.phone || "Not recorded"}
                 </p>
               </div>
 
@@ -230,10 +237,10 @@ export default function HCPDetailDrawer({
                 </p>
                 <p className="text-xs text-slate-800 flex items-center gap-2 font-medium">
                   <Clock className="w-3.5 h-3.5 text-slate-400" />
-                  {doctor.preferredTime || "Tuesdays & Thursdays, 2:00 - 4:00 PM"}
+                  {doctor.preferredTime || "Not recorded"}
                 </p>
                 <p className="text-xs text-slate-500">
-                  Location: {doctor.city}, {doctor.state}
+                  Location: {placeLabel(doctor)}
                 </p>
               </div>
             </div>
@@ -275,7 +282,7 @@ export default function HCPDetailDrawer({
                         </span>
                       </div>
                       <span className="text-xs text-slate-400 font-mono">
-                        {int.time || "Logged"}
+                        {int.time}
                       </span>
                     </div>
 
@@ -306,128 +313,105 @@ export default function HCPDetailDrawer({
           </div>
         )}
 
-        {/* TAB 3: PRODUCT ADOPTION MATRIX */}
+        {/* TAB 3: PRODUCTS DISCUSSED (from logged interactions) */}
         {activeTab === "products" && (
           <div className="space-y-3.5 animate-fade-in">
-            {[
-              { product: "CardioPlus 50mg", stage: "Regular Prescriber", volume: "High", interest: "94%", step: 4 },
-              { product: "GlucoCare Duo", stage: "Clinical Evaluation", volume: "Medium", interest: "85%", step: 3 },
-              { product: "OrthoFlex Plus", stage: "Sample Trial", volume: "Testing", interest: "65%", step: 2 },
-              { product: "OncoShield 250", stage: "Formulary Review", volume: "Institutional", interest: "88%", step: 3 },
-            ].map((prod, idx) => (
-              <div
-                key={idx}
-                className="p-4 rounded-xl border border-slate-200 bg-white card-shadow space-y-2.5"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-sm sm:text-base">
-                      {prod.product}
-                    </h4>
+            {productRows.length > 0 ? (
+              productRows.map((row) => (
+                <div
+                  key={row.product}
+                  className="p-4 rounded-xl border border-slate-200 bg-white card-shadow flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-slate-900 text-sm sm:text-base truncate">{row.product}</h4>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Stage: <strong className="text-teal-700 font-semibold">{prod.stage}</strong>
+                      {row.last ? `Last discussed ${monthDay(row.last)}` : "Not discussed yet"}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <span className="font-mono font-bold text-emerald-700 text-xs sm:text-sm">
-                      {prod.interest} Alignment
+                  <div className="text-right shrink-0 space-y-1">
+                    <span className="font-mono font-bold text-slate-800 text-xs sm:text-sm">
+                      {pluralize(row.count, "discussion")}
                     </span>
-                    <p className="text-xs text-slate-400">Vol: {prod.volume}</p>
+                    {row.sentiment && (
+                      <div>
+                        <Badge variant={row.sentiment} size="xs" dot>
+                          {row.sentiment}
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {/* 4-Stage Adoption Progress Bar */}
-                <div className="grid grid-cols-4 gap-1.5 pt-1">
-                  {["Awareness", "Evaluation", "Trial", "Prescribing"].map((stg, stgIdx) => (
-                    <div key={stgIdx} className="space-y-1">
-                      <div
-                        className={`h-2 rounded-full ${
-                          stgIdx < prod.step ? "bg-teal-500" : "bg-slate-200"
-                        }`}
-                      />
-                      <span className="text-[10px] font-mono text-slate-500 font-medium block truncate">
-                        {stg}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+              ))
+            ) : (
+              <div className="p-8 text-center bg-slate-50/80 rounded-xl border border-dashed border-slate-200">
+                <p className="font-bold text-slate-700 text-sm">No products recorded</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Products appear here once they are listed on the profile or discussed in a logged visit.
+                </p>
               </div>
-            ))}
+            )}
           </div>
         )}
 
-        {/* TAB 4: AI BRIEFING & CLINICAL STRATEGY */}
+        {/* TAB 4: CRM BRIEFING (assembled from stored data only) */}
         {activeTab === "ai_strategy" && (
           <div className="space-y-4 animate-fade-in">
-            {/* Primary Strategy Brief */}
             <div className="p-5 rounded-2xl bg-slate-900 text-slate-200 border border-slate-800 space-y-3 shadow-md">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-teal-400 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-teal-300" />
-                  AI Clinical Briefing & Detailing Strategy
-                </h4>
-                <span className="text-xs font-mono text-teal-300 px-2.5 py-0.5 rounded-md bg-teal-950/80 border border-teal-800/80 font-semibold">
-                  98% Confidence
-                </span>
-              </div>
+              <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-teal-400 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-teal-300" />
+                Briefing From Your CRM Data
+              </h4>
               <ul className="space-y-2.5 text-slate-200 leading-relaxed text-xs sm:text-sm">
                 <li className="flex items-start gap-2.5">
                   <span className="w-2 h-2 rounded-full bg-teal-400 mt-1.5 shrink-0" />
                   <div>
-                    <strong className="text-white font-semibold">Clinical Trial Focus:</strong> Highlight the recent REDUCE-HF Phase-3 cardiovascular outcomes data showing a 24% reduction in hospital re-admission.
+                    <strong className="text-white font-semibold">Last contact:</strong>{" "}
+                    {latest
+                      ? `${monthDay(latest.date)} (${latest.visitType}). ${latest.aiSummary?.summary || latest.rawNotes}`
+                      : "No interactions logged yet."}
                   </div>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="w-2 h-2 rounded-full bg-teal-400 mt-1.5 shrink-0" />
                   <div>
-                    <strong className="text-white font-semibold">Objection Mitigation:</strong> Address patient tolerability in geriatric cohorts (doctor has expressed past preference for minimal titration schedules).
+                    <strong className="text-white font-semibold">Open follow-up:</strong>{" "}
+                    {doctor.nextFollowUpAction
+                      ? `${doctor.nextFollowUpAction} (due ${monthDay(doctor.nextFollowUpDate)}${
+                          doctor.overdueFollowUps ? `, ${doctor.overdueFollowUps} overdue` : ""
+                        })`
+                      : "None."}
                   </div>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="w-2 h-2 rounded-full bg-teal-400 mt-1.5 shrink-0" />
                   <div>
-                    <strong className="text-white font-semibold">Actionable Commitment:</strong> Propose hospital CME co-sponsorship for their department in the upcoming quarter.
+                    <strong className="text-white font-semibold">Products of interest:</strong>{" "}
+                    {(doctor.productsOfInterest || []).join(", ") || "None recorded."}
                   </div>
                 </li>
               </ul>
             </div>
 
-            {/* OBJECTION PLAYBOOK */}
             <div className="space-y-2.5">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
                 <ShieldAlert className="w-4 h-4 text-amber-600 stroke-[2]" />
-                <h4>Physician Objection Playbook</h4>
+                <h4>Recorded Objections</h4>
               </div>
 
-              <div className="space-y-2.5">
-                <div className="p-4 bg-amber-50/70 rounded-xl border border-amber-200/80 text-sm space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-amber-900 text-xs sm:text-sm">
-                      Objection: Generic Price Differential
-                    </span>
-                    <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold">
-                      Common
-                    </span>
-                  </div>
-                  <p className="text-amber-950 text-xs sm:text-sm leading-relaxed">
-                    <strong className="font-semibold">Evidence Response:</strong> Present the pharmacoeconomic daily savings chart showing fewer re-hospitalizations offsets per-unit medication cost by ₹1,400/month.
-                  </p>
+              {objections.length > 0 ? (
+                <div className="space-y-2.5">
+                  {objections.map((o, idx) => (
+                    <div key={idx} className="p-4 bg-amber-50/70 rounded-xl border border-amber-200/80 text-sm space-y-1">
+                      <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold">
+                        {monthDay(o.date)}
+                      </span>
+                      <p className="text-amber-950 text-xs sm:text-sm leading-relaxed">{o.text}</p>
+                    </div>
+                  ))}
                 </div>
-
-                <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200 text-sm space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900 text-xs sm:text-sm">
-                      Objection: Patient Titration Complexity
-                    </span>
-                    <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 font-bold">
-                      Clinical
-                    </span>
-                  </div>
-                  <p className="text-slate-700 text-xs sm:text-sm leading-relaxed">
-                    <strong className="font-semibold">Evidence Response:</strong> Provide simplified once-daily titration wheel and 15 patient starter kits for trial evaluation.
-                  </p>
-                </div>
-              </div>
+              ) : (
+                <p className="text-xs text-slate-400">No objections have been recorded for this doctor.</p>
+              )}
             </div>
 
             {/* CTA */}
@@ -440,7 +424,7 @@ export default function HCPDetailDrawer({
               className="w-full p-3 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-bold transition flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm shadow-2xs"
             >
               <Sparkles className="w-4 h-4 text-teal-600" />
-              Launch Deep Strategy Analysis in AI Copilot →
+              Ask the AI Analyst about this doctor →
             </button>
           </div>
         )}

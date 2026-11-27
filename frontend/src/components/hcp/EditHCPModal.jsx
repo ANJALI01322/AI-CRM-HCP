@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { updateHCP } from "../../redux/slices/hcpSlice";
-import { SPECIALTIES, HOSPITALS, PRODUCTS_CATALOG } from "../../constants/mockData";
+import { SPECIALTIES } from "../../constants/options";
 import Modal from "../common/Modal";
 import Button from "../common/Button";
 import toast from "react-hot-toast";
 
 export default function EditHCPModal({ isOpen, onClose, doctor }) {
   const dispatch = useDispatch();
+  const hcps = useSelector((state) => state.hcp.items);
+  const products = useSelector((state) => state.catalog.products);
+  const specialtyOptions = [...new Set([...SPECIALTIES, ...hcps.map((h) => h.specialty)])].sort();
+  const hospitalOptions = [...new Set(hcps.map((h) => h.hospital))].sort();
   const [formData, setFormData] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -108,13 +112,13 @@ export default function EditHCPModal({ isOpen, onClose, doctor }) {
               Specialization
             </label>
             <select
-              value={formData.specialty || SPECIALTIES[0]}
+              value={formData.specialty || ""}
               onChange={(e) =>
                 setFormData({ ...formData, specialty: e.target.value })
               }
               className="w-full text-xs sm:text-sm p-2.5 rounded-lg border border-slate-300 bg-white"
             >
-              {SPECIALTIES.map((spec) => (
+              {specialtyOptions.map((spec) => (
                 <option key={spec} value={spec}>
                   {spec}
                 </option>
@@ -126,19 +130,21 @@ export default function EditHCPModal({ isOpen, onClose, doctor }) {
             <label className="block text-xs font-semibold text-slate-700 mb-1">
               Hospital / Institution
             </label>
-            <select
-              value={formData.hospital || HOSPITALS[0]}
+            <input
+              type="text"
+              list="hospital-options"
+              placeholder="e.g. City General Hospital"
+              value={formData.hospital || ""}
               onChange={(e) =>
                 setFormData({ ...formData, hospital: e.target.value })
               }
               className="w-full text-xs sm:text-sm p-2.5 rounded-lg border border-slate-300 bg-white"
-            >
-              {HOSPITALS.map((hosp) => (
-                <option key={hosp} value={hosp}>
-                  {hosp}
-                </option>
+            />
+            <datalist id="hospital-options">
+              {hospitalOptions.map((hosp) => (
+                <option key={hosp} value={hosp} />
               ))}
-            </select>
+            </datalist>
           </div>
         </div>
 
@@ -229,7 +235,7 @@ export default function EditHCPModal({ isOpen, onClose, doctor }) {
             Key Products of Interest
           </label>
           <div className="flex flex-wrap gap-2">
-            {PRODUCTS_CATALOG.map((prod) => {
+            {products.map((prod) => {
               const isSelected = (formData.productsOfInterest || []).includes(
                 prod.name
               );

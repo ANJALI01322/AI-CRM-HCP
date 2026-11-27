@@ -75,11 +75,7 @@ export default function Sidebar() {
   );
   const hcps = useSelector((state) => state.hcp.items);
   const user = useSelector((state) => state.auth.user);
-  const schedule = useSelector((state) => state.dashboard.schedule);
-
-  const pendingVisitsCount = schedule.filter(
-    (s) => s.status !== "Completed"
-  ).length;
+  const stats = useSelector((state) => state.dashboard.stats);
 
   const sidebarContent = (
     <div className="flex flex-col h-full bg-slate-950 text-slate-300 select-none border-r border-slate-800/80 text-sm">
@@ -185,21 +181,23 @@ export default function Sidebar() {
             <div className="bg-slate-900/80 rounded-xl p-3 border border-slate-800/80 space-y-2.5 shadow-inner">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                  <Calendar className="w-3.5 h-3.5 text-teal-400" /> Field Schedule
+                  <Calendar className="w-3.5 h-3.5 text-teal-400" /> Follow-ups
                 </span>
                 <span className="font-mono font-bold text-slate-200">
-                  {pendingVisitsCount} Pending
+                  {stats ? `${stats.followUps.dueNow} Due` : "—"}
                 </span>
               </div>
               <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
                 <div
                   className="bg-teal-500 h-full rounded-full transition-all"
-                  style={{ width: "75%" }}
+                  style={{ width: `${stats?.coverageLast30Days.pct || 0}%` }}
                 />
               </div>
               <div className="flex items-center justify-between text-xs text-slate-500 font-mono">
-                <span>Coverage: 74%</span>
-                <span className="text-teal-400 font-bold">↑ 12% Q3</span>
+                <span>{stats ? `Coverage (30d): ${stats.coverageLast30Days.pct}%` : "Coverage: —"}</span>
+                <span className="text-teal-400 font-bold">
+                  {stats ? `${stats.coverageLast30Days.touched}/${stats.coverageLast30Days.total} HCPs` : ""}
+                </span>
               </div>
             </div>
           </div>

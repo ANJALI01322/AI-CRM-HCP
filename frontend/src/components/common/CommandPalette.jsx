@@ -13,7 +13,6 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { setSelectedHCP } from "../../redux/slices/hcpSlice";
-import { PRODUCTS_CATALOG } from "../../constants/mockData";
 import HCPAvatar from "./HCPAvatar";
 
 export default function CommandPalette({ isOpen, onClose }) {
@@ -25,6 +24,7 @@ export default function CommandPalette({ isOpen, onClose }) {
   const inputRef = useRef(null);
 
   const hcps = useSelector((state) => state.hcp.items);
+  const catalog = useSelector((state) => state.catalog.products);
 
   // Filter items
   const matchedHCPs = query.trim()
@@ -38,11 +38,11 @@ export default function CommandPalette({ isOpen, onClose }) {
         .slice(0, 4)
     : hcps.slice(0, 4);
 
-  const matchedProducts = PRODUCTS_CATALOG.filter(
+  const matchedProducts = catalog.filter(
     (p) =>
       !query.trim() ||
       p.name.toLowerCase().includes(query.toLowerCase()) ||
-      p.indication.toLowerCase().includes(query.toLowerCase())
+      (p.indication || "").toLowerCase().includes(query.toLowerCase())
   ).slice(0, 3);
 
   const actions = [
@@ -266,10 +266,10 @@ export default function CommandPalette({ isOpen, onClose }) {
                     >
                       <div>
                         <p className="font-bold text-slate-900 text-sm">{p.name}</p>
-                        <p className="text-xs text-slate-500">{p.indication}</p>
+                        <p className="text-xs text-slate-500">{p.indication || ""}</p>
                       </div>
                       <span className="text-xs font-mono font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200">
-                        {p.category}
+                        {p.category || "Product"}
                       </span>
                     </div>
                   ))}
