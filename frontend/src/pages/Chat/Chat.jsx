@@ -16,7 +16,8 @@ import {
   CheckCircle2,
   BrainCircuit,
 } from "lucide-react";
-import { askAI } from "../../services/interactionService";
+import { sendChat } from "../../services/interactionService";
+import { errorMessage } from "../../services/crmApi";
 import { updateActiveDraft } from "../../redux/slices/interactionSlice";
 import { getInitials } from "../../components/common/HCPAvatar";
 import PageHeader from "../../components/common/PageHeader";
@@ -25,11 +26,25 @@ import Badge from "../../components/common/Badge";
 import toast from "react-hot-toast";
 
 const SUGGESTED_PROMPTS = [
-  "Which HCPs need attention today?",
-  "Prepare talking points for Dr. Rahul Sharma on CardioPlus 50mg Phase-3 trial data.",
-  "Summarize key objections regarding NeuroGuard XR pricing vs generics.",
-  "What is the institutional strategy for OncoShield AIIMS P&T committee review?",
+  "Which HCPs need attention this week?",
+  "List my overdue follow-ups",
+  "Summarize my territory for the last 30 days",
+  "What objections have doctors raised recently?",
 ];
+
+const HISTORY_LIMIT = 10;
+
+// Plain-text form of a message, used for copy and as conversation history for the API.
+const messageText = (m) =>
+  m.type === "structured_insight"
+    ? [m.signal, m.evidence, m.interpretation, m.recommendation].filter(Boolean).join("\n\n")
+    : m.text;
+
+const toHistory = (messages) =>
+  messages
+    .filter((m) => m.id !== "msg-1" && m.type !== "error" && messageText(m))
+    .slice(-HISTORY_LIMIT)
+    .map((m) => ({ role: m.sender === "user" ? "user" : "assistant", content: messageText(m).slice(0, 4000) }));
 
 export default function Chat() {
   const navigate = useNavigate();
@@ -41,7 +56,7 @@ export default function Chat() {
       id: "msg-1",
       sender: "ai",
       type: "text",
-      text: "Ask for clinical talking points, doctor background, objection handling, or territory priorities.",
+      text: "Ask about your HCPs, recent interactions, overdue follow-ups, or territory priorities. Answers come only from your CRM data.",
       time: "Just now",
     },
   ]);
@@ -57,25 +72,32 @@ export default function Chat() {
   const nowTime = () =>
     new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-  const requestAI = async (query) => {
+  const requestAI = async (query, history) => {
     setIsLoading(true);
     try {
-      const { raw, structured } = await askAI(query);
-      const aiMsg = structured
-        ? {
-            id: `ai-${Date.now()}`,
-            sender: "ai",
-            type: "structured_insight",
-            signal: structured["Doctor Name"]
-              ? `Physician Intelligence: ${structured["Doctor Name"]}`
-              : "AI Response",
-            evidence: structured.Summary || null,
-            interpretation: structured.Sentiment ? `Sentiment: ${structured.Sentiment}` : null,
-            recommendation: structured["Follow-up Action"] || null,
-            text: raw,
-            time: nowTime(),
-          }
-        : { id: `ai-${Date.now()}`, sender: "ai", type: "text", text: raw, time: nowTime() };
+      const { answer, toolsUsed, model, latencyMs } = await sendChat(query, history);
+      const meta = { model, latencyMs, toolsUsed };
+      const aiMsg =
+        answer.kind === "answer"
+          ? {
+              id: `ai-${Date.now()}`,
+              sender: "ai",
+              type: "structured_insight",
+              signal: answer.title,
+              evidence: answer.evidence,
+              interpretation: answer.interpretation,
+              recommendation: answer.recommendation,
+              meta,
+              time: nowTime(),
+            }
+          : {
+              id: `ai-${Date.now()}`,
+              sender: "ai",
+              type: "text",
+              text: answer.message || answer.title,
+              meta,
+              time: nowTime(),
+            };
       setMessages((prev) => [...prev, aiMsg]);
     } catch (err) {
       console.error("AI request failed:", err);
@@ -86,7 +108,8 @@ export default function Chat() {
           sender: "ai",
           type: "error",
           query,
-          text: err?.response?.data?.detail || err?.message || "Request failed",
+          history,
+          text: errorMessage(err),
           time: nowTime(),
         },
       ]);
@@ -99,18 +122,19 @@ export default function Chat() {
     const query = textToSend || inputText;
     if (!query.trim() || isLoading) return;
 
+    const history = toHistory(messages);
     setMessages((prev) => [
       ...prev,
       { id: `user-${Date.now()}`, sender: "user", text: query, time: nowTime() },
     ]);
     setInputText("");
-    requestAI(query);
+    requestAI(query, history);
   };
 
   const handleRetry = (errorMsg) => {
     if (isLoading) return;
     setMessages((prev) => prev.filter((m) => m.id !== errorMsg.id));
-    requestAI(errorMsg.query);
+    requestAI(errorMsg.query, errorMsg.history);
   };
 
   const handleCopyMessage = (text) => {
@@ -121,7 +145,7 @@ export default function Chat() {
   const handleInsertToInteraction = (msg) => {
     dispatch(
       updateActiveDraft({
-        rawNotes: msg.text || msg.evidence,
+        rawNotes: messageText(msg),
       })
     );
     toast.success("Transferred to Detailing Log draft!");
@@ -134,7 +158,7 @@ export default function Chat() {
         id: "msg-1",
         sender: "ai",
         type: "text",
-        text: "Workspace cleared. Ask any territory analysis, doctor briefing, or clinical strategy query below.",
+        text: "Workspace cleared. Ask about your HCPs, interactions, follow-ups, or territory.",
         time: "Just now",
       },
     ]);
@@ -207,7 +231,7 @@ export default function Chat() {
                 >
                   <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0 space-y-1">
-                    <p className="font-bold text-rose-800 text-sm">AI service unavailable</p>
+                    <p className="font-bold text-rose-800 text-sm">AI request failed</p>
                     <p className="text-xs text-rose-700 wrap-break-word">{msg.text}</p>
                   </div>
                   <Button
@@ -256,7 +280,7 @@ export default function Chat() {
                       <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500 block">
                         Evidence & Data Points:
                       </span>
-                      <p className="text-slate-800 leading-relaxed text-xs sm:text-sm font-sans">
+                      <p className="text-slate-800 leading-relaxed text-xs sm:text-sm font-sans whitespace-pre-line">
                         {msg.evidence}
                       </p>
                     </div>
@@ -267,7 +291,7 @@ export default function Chat() {
                       <span className="text-xs font-mono font-bold uppercase tracking-wider text-teal-800 block">
                         Strategic Interpretation:
                       </span>
-                      <p className="text-slate-800 leading-relaxed text-xs sm:text-sm font-sans">
+                      <p className="text-slate-800 leading-relaxed text-xs sm:text-sm font-sans whitespace-pre-line">
                         {msg.interpretation}
                       </p>
                     </div>
@@ -278,7 +302,7 @@ export default function Chat() {
                       <span className="text-xs font-mono font-semibold uppercase tracking-wider text-teal-300 flex items-center gap-1.5">
                         <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" /> Recommended Action:
                       </span>
-                      <p className="text-slate-200 leading-relaxed text-xs sm:text-sm font-medium">
+                      <p className="text-slate-200 leading-relaxed text-xs sm:text-sm font-medium whitespace-pre-line">
                         {msg.recommendation}
                       </p>
                     </div>
@@ -292,11 +316,14 @@ export default function Chat() {
 
                   {/* Action Footer */}
                   <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-slate-400 text-xs font-mono">
-                    <span>{msg.time}</span>
+                    <span title={msg.meta?.toolsUsed?.length ? `Tools: ${msg.meta.toolsUsed.join(", ")}` : undefined}>
+                      {msg.time}
+                      {msg.meta && ` • ${msg.meta.model} • ${(msg.meta.latencyMs / 1000).toFixed(1)}s`}
+                    </span>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => handleCopyMessage(msg.text || msg.evidence)}
+                        onClick={() => handleCopyMessage(messageText(msg))}
                         className="px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer font-medium"
                       >
                         <Copy className="w-3.5 h-3.5" /> Copy Dossier
@@ -320,10 +347,10 @@ export default function Chat() {
             <div className="bg-white border border-slate-200/90 rounded-2xl p-5 max-w-2xl mr-auto space-y-2 card-shadow">
               <div className="flex items-center gap-2.5 text-teal-700 font-semibold text-sm">
                 <Sparkles className="w-4 h-4 animate-spin" />
-                <span>Synthesizing Clinical Evidence & Territory Data...</span>
+                <span>Querying your CRM data...</span>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Evaluating trial registries, physician history, and commercial milestones with LangGraph.
+                The LangGraph agent is calling CRM tools scoped to your access, then writing an answer from the results.
               </p>
             </div>
           )}
@@ -342,7 +369,7 @@ export default function Chat() {
           >
             <input
               type="text"
-              placeholder="Ask for clinical talking points, doctor background, objection handling, or territory priority..."
+              placeholder="Ask about HCPs, interactions, follow-ups, or territory priorities..."
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               className="flex-1 text-sm px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition shadow-2xs placeholder:text-slate-400 font-medium"

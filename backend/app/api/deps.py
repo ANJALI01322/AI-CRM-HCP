@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import Depends, Header, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -61,11 +61,29 @@ def require_manager(ctx: RequestContext = Depends(get_context)) -> RequestContex
     return ctx
 
 
-def local_today(
+@dataclass(frozen=True)
+class Clock:
+    """The caller's local 'today' and timezone, so day boundaries match what the user sees."""
+
+    today: date
+    tz: timezone
+
+    def start_of(self, d: date) -> datetime:
+        return datetime.combine(d, time.min, tzinfo=self.tz)
+
+    def days_ago(self, days: int) -> datetime:
+        return self.start_of(self.today - timedelta(days=days))
+
+
+def client_clock(
     x_tz_offset: int | None = Header(None, ge=-840, le=840, description="Client UTC offset in minutes (IST = 330)"),
-) -> date:
-    """'Today' in the caller's timezone, so due/overdue/today counts match what the user sees."""
-    return (datetime.now(timezone.utc) + timedelta(minutes=x_tz_offset or 0)).date()
+) -> Clock:
+    tz = timezone(timedelta(minutes=x_tz_offset or 0))
+    return Clock(today=datetime.now(tz).date(), tz=tz)
+
+
+def local_today(clock: Clock = Depends(client_clock)) -> date:
+    return clock.today
 
 
 @dataclass(frozen=True)

@@ -2,8 +2,8 @@ import logging
 import time
 from datetime import date
 
+import groq
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -14,15 +14,10 @@ from app.core import config
 from app.langgraph.workflow import extraction_graph
 from app.models import HCP
 from app.schemas.ai import ExtractRequest, ExtractResponse
-from app.tools.log_interaction import log_interaction
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/interaction", tags=["Interaction"], dependencies=[Depends(get_context)])
-
-
-class InteractionRequest(BaseModel):
-    notes: str
 
 
 @router.post("/ai/extract", response_model=ExtractResponse)
@@ -41,6 +36,8 @@ def extract_interaction(
         result = extraction_graph.invoke({"notes": payload.notes, "today": today, "hcps": hcps})
     except LLMNotConfigured as exc:
         raise HTTPException(status_code=503, detail=f"AI service unavailable: {exc}")
+    except groq.RateLimitError:
+        raise HTTPException(status_code=429, detail="AI provider rate limit reached. Please retry in a minute.")
     except Exception:
         logger.exception("AI extraction failed")
         raise HTTPException(status_code=503, detail="AI service unavailable")
@@ -60,17 +57,3 @@ def extract_interaction(
         attempts=result["attempts"],
     )
 
-
-@router.post("/ai")
-def generate_ai(request: InteractionRequest):
-    """Legacy free-form endpoint used by the chat page until it moves to /api/chat."""
-    try:
-        output = log_interaction(request.notes)
-    except LLMNotConfigured as exc:
-        logger.error("AI request rejected: %s", exc)
-        raise HTTPException(status_code=503, detail=f"AI service unavailable: {exc}")
-    except Exception:
-        logger.exception("AI request failed")
-        raise HTTPException(status_code=503, detail="AI service unavailable")
-
-    return {"success": True, "data": output}

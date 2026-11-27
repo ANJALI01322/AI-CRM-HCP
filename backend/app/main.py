@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 
 from app.agents.crm_agent import check_llm
 from app.api.auth import router as auth_router
+from app.api.chat import router as chat_router
 from app.api.dashboard import router as dashboard_router
 from app.api.follow_ups import router as follow_ups_router
 from app.api.hcps import router as hcps_router
@@ -48,6 +49,7 @@ def health():
 
 
 api.include_router(auth_router)
+api.include_router(chat_router)
 api.include_router(interaction_router)
 api.include_router(dashboard_router)
 api.include_router(hcps_router)
