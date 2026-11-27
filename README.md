@@ -1,92 +1,99 @@
-# AI CRM for Healthcare Professionals
+# OmniHealth CRM
 
-## Overview
+An AI-first CRM for pharma field reps: log a visit in plain language, get a structured draft to review, and ask questions answered only from your own CRM data.
 
-An AI-powered CRM system built for Healthcare Professionals (HCPs) that helps medical representatives log doctor interactions, generate AI-powered summaries, and manage HCP information.
+## The problem
+
+Field reps lose hours re-typing visit notes into rigid forms, and managers can't see which doctors are going cold. Generic chatbots make things up. OmniHealth turns free-text notes into structured records you confirm, and its analyst only answers from data it reads through scoped tools.
 
 ## Features
 
-- AI-powered interaction summarization
-- HCP Directory
-- Dashboard with CRM statistics
-- Log Interaction module
-- AI Chat Assistant
-- FastAPI backend
-- LangGraph workflow
-- Groq LLM integration
+- **Login and roles**: JWT auth (24h). Reps see their assigned HCPs and own activity; managers see the whole organization. Other organizations' data returns 404.
+- **AI interaction logging**: notes go through a LangGraph pipeline (extract, validate with one retry, fuzzy-match the HCP). You edit the draft, then confirm to save. The model name and latency are shown.
+- **AI Analyst chat**: a tool-calling agent that answers from your database (HCP profile, recent interactions, overdue follow-ups, territory summary), says when data is missing, and declines off-topic questions.
+- **Dashboard**: HCP count, relationship health distribution, follow-ups due/overdue, today's visits, 30-day channel mix and coverage, and a ranked Next Best Actions queue with reasons built from stored data.
+- **HCP directory**: search, filters, 360-degree drawer, add/edit/delete.
+- **Follow-ups**: open/overdue/today/upcoming views, mark done, reschedule.
+- **Manager view**: per-rep activity table (interactions, last activity, overdue follow-ups).
+- **CSV export** of HCPs and interactions (respects your role), and a **command palette** (Cmd/Ctrl+K) that searches HCPs.
+- **Hardening**: uniform error format with request ids, security headers, CORS allow-list, input validation, rate limits.
 
-## Tech Stack
+## Architecture
 
-### Frontend
-- React
-- Vite
-- Tailwind CSS
-- Redux Toolkit
-- React Router
-
-### Backend
-- FastAPI
-- LangGraph
-- LangChain
-- Groq API
-- Python
-
-## Project Structure
-
-```
-AI-CRM-HCP
-│
-├── frontend
-├── backend
-└── README.md
+```mermaid
+flowchart LR
+    UI[React + Redux + Vite] -->|/api, JWT| API[FastAPI]
+    API --> LG[LangGraph]
+    LG -->|structured output / tool calls| GROQ[Groq LLM]
+    LG -->|scoped queries| DB[(Postgres - Neon)]
+    API --> DB
 ```
 
-## Installation
+### LangGraph graphs
 
-### Frontend
+```mermaid
+flowchart TD
+    subgraph Extraction["Interaction extraction"]
+        E[extract] --> V{validate}
+        V -->|invalid, first try| E
+        V -->|valid| M[match_hcp]
+        V -->|invalid, retried| X([error])
+        M --> End1([draft + candidates])
+    end
+    subgraph Analyst["AI Analyst"]
+        A[agent] -->|tool calls| T[tools: profile, interactions, overdue, territory]
+        T --> A
+        A -->|no more calls| R[respond: structured card]
+        R --> End2([answer])
+    end
+```
+
+## Tech stack
+
+React 19, Vite, Redux Toolkit, axios, Tailwind 4 | FastAPI, Pydantic 2, SQLAlchemy 2, Alembic | LangGraph, LangChain, Groq (`openai/gpt-oss-120b`) | Postgres (Neon) | Vercel (services)
+
+## Demo credentials (after seeding)
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Rep | `rep@demo.com` | `Demo@123` |
+| Manager | `manager@demo.com` | `Demo@123` |
+
+The login page also has **Try demo (Rep)** and **Try demo (Manager)** buttons.
+
+## Local setup
 
 ```bash
-cd frontend
-npm install
-npm run dev
+cd backend && python -m venv venv && venv/Scripts/pip install -r requirements.txt   # Windows; use venv/bin/pip on macOS/Linux
+cp .env.example .env   # then fill DATABASE_URL, GROQ_API_KEY, JWT_SECRET
+venv/Scripts/alembic upgrade head && venv/Scripts/python seed.py && venv/Scripts/uvicorn app.main:app --reload
+cd ../frontend && npm install
+npm run dev            # http://localhost:5173 (proxies /api to :8000)
 ```
 
-### Backend
+Run tests: `cd backend && pip install -r requirements-dev.txt && pytest` (uses in-memory SQLite and a mocked LLM).
 
-```bash
-cd backend
+## Environment variables
 
-python -m venv venv
+| Variable | Where | Required | Purpose |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | backend | yes | Postgres connection string |
+| `GROQ_API_KEY` | backend | yes | Groq API key |
+| `JWT_SECRET` | backend | yes | Token signing secret, 32+ chars |
+| `MODEL_NAME` | backend | no | Default `openai/gpt-oss-120b` |
+| `ALLOWED_ORIGINS` | backend | no | CORS origins, comma-separated (default `http://localhost:5173`) |
+| `LOG_LEVEL` | backend | no | Default `INFO` |
+| `DEMO_ORG_SLUG` | backend | no | Seed organization slug, default `demo` |
+| `VITE_API_URL` | frontend | no | API base incl. `/api`; empty = same-origin |
+| `VITE_DEV_API_TARGET` | frontend | no | Dev proxy target, default `http://localhost:8000` |
 
-# Activate venv (Windows)
-venv\Scripts\activate
+## Deploy
 
-pip install -r requirements.txt
+See [DEPLOY.md](DEPLOY.md) for Vercel setup, manual migrations and a 10-step checklist.
 
-alembic upgrade head   # create/upgrade tables
-python seed.py         # load demo org data (once)
+## Roadmap
 
-python -m uvicorn app.main:app --reload
-```
-
-Copy `backend/.env.example` to `backend/.env` and fill in `DATABASE_URL` and `GROQ_API_KEY`.
-All routes are served under `/api`. In dev, Vite proxies `/api` to `http://localhost:8000`.
-
-Check configuration at `/api/health` — it returns `{status, db, llm}` and HTTP 503 if anything is misconfigured.
-
-## API Documentation
-
-Open:
-
-```
-http://localhost:8000/api/docs
-```
-
-## Future Improvements
-
-- Authentication
-- Database Integration
-- Notifications
-- Analytics Dashboard
-- Voice Notes
-- AI-powered Follow-up Recommendations
+- Mobile offline app
+- GPS check-in
+- Sample inventory
+- Multi-org billing
