@@ -1,4 +1,4 @@
-from app.agents.crm_agent import llm
+from app.agents.crm_agent import get_llm
 
 
 def edit_interaction(old_notes: str, changes: str):
@@ -25,6 +25,6 @@ Sentiment
 Follow-up Action
 """
 
-    response = llm.invoke(prompt)
+    response = get_llm().invoke(prompt)
 
     return response.content

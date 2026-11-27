@@ -7,6 +7,8 @@ import {
   Activity,
   FileCheck,
   Building,
+  AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import Badge from "../common/Badge";
 import Button from "../common/Button";
@@ -15,17 +17,23 @@ import toast from "react-hot-toast";
 export default function AISummaryCard({
   aiResult,
   isLoading,
+  error,
+  onRetry,
   onSaveInteraction,
 }) {
   const structured = aiResult?.structured;
+  const raw = aiResult?.raw;
+  const hasResult = Boolean(structured || raw);
 
   const handleCopySummary = () => {
-    if (!structured) return;
-    const text = `HCP: ${structured["Doctor Name"] || ""}\nHospital: ${
-      structured["Hospital"] || ""
-    }\nSummary: ${structured["Summary"] || ""}\nSentiment: ${
-      structured["Sentiment"] || ""
-    }\nFollow-up: ${structured["Follow-up Action"] || ""}`;
+    if (!hasResult) return;
+    const text = structured
+      ? `HCP: ${structured["Doctor Name"] || ""}\nHospital: ${
+          structured["Hospital"] || ""
+        }\nSummary: ${structured["Summary"] || ""}\nSentiment: ${
+          structured["Sentiment"] || ""
+        }\nFollow-up: ${structured["Follow-up Action"] || ""}`
+      : raw;
     navigator.clipboard.writeText(text);
     toast.success("AI Summary copied to clipboard!");
   };
@@ -46,7 +54,7 @@ export default function AISummaryCard({
           </div>
         </div>
 
-        {structured && (
+        {hasResult && !isLoading && (
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -78,6 +86,30 @@ export default function AISummaryCard({
               </p>
             </div>
           </div>
+        ) : error ? (
+          <div
+            role="alert"
+            className="py-12 text-center space-y-3 border border-rose-200 rounded-xl bg-rose-50/60 p-6"
+          >
+            <AlertTriangle className="w-8 h-8 text-rose-500 mx-auto" />
+            <h4 className="text-sm font-bold text-rose-800">
+              AI service unavailable
+            </h4>
+            <p className="text-xs text-rose-700 max-w-xs mx-auto leading-relaxed wrap-break-word">
+              {error}
+            </p>
+            {onRetry && (
+              <Button
+                variant="outline"
+                size="sm"
+                icon={RotateCcw}
+                onClick={onRetry}
+                className="cursor-pointer"
+              >
+                Retry
+              </Button>
+            )}
+          </div>
         ) : structured ? (
           <div className="space-y-4 animate-fade-in">
             {/* Extracted Doctor & Sentiment Row */}
@@ -87,25 +119,23 @@ export default function AISummaryCard({
                   Target HCP & Hospital
                 </p>
                 <h4 className="text-sm sm:text-base font-bold text-slate-900 truncate mt-0.5">
-                  {structured["Doctor Name"] || "Healthcare Professional"}
+                  {structured["Doctor Name"] || "Not identified"}
                 </h4>
                 <p className="text-xs text-slate-600 truncate mt-0.5 font-medium">
-                  {structured["Hospital"] || "Hospital / Clinic"}
+                  {structured["Hospital"] || "Not identified"}
                 </p>
               </div>
 
-              <div className="text-right shrink-0">
-                <p className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500 mb-1">
-                  Sentiment
-                </p>
-                <Badge
-                  variant={structured["Sentiment"] || "Positive"}
-                  size="md"
-                  dot
-                >
-                  {structured["Sentiment"] || "Positive"}
-                </Badge>
-              </div>
+              {structured["Sentiment"] && (
+                <div className="text-right shrink-0">
+                  <p className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500 mb-1">
+                    Sentiment
+                  </p>
+                  <Badge variant={structured["Sentiment"]} size="md" dot>
+                    {structured["Sentiment"]}
+                  </Badge>
+                </div>
+              )}
             </div>
 
             {/* Key Summary */}
@@ -156,6 +186,15 @@ export default function AISummaryCard({
               </div>
             )}
           </div>
+        ) : raw ? (
+          <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-1.5 animate-fade-in">
+            <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500">
+              AI Response (unstructured)
+            </h5>
+            <p className="text-slate-800 leading-relaxed text-xs sm:text-sm whitespace-pre-wrap wrap-break-word">
+              {raw}
+            </p>
+          </div>
         ) : (
           <div className="py-14 text-center space-y-2 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 p-6">
             <Sparkles className="w-8 h-8 text-slate-300 mx-auto" />
@@ -169,7 +208,7 @@ export default function AISummaryCard({
         )}
 
         {/* Save to CRM History Button */}
-        {structured && !isLoading && (
+        {hasResult && !isLoading && !error && (
           <div className="pt-2 border-t border-slate-100">
             <Button
               variant="primary"

@@ -38,44 +38,20 @@ export const parseAIStructuredOutput = (rawOutput) => {
 };
 
 /**
- * Sends notes to backend LangGraph AI router
+ * Sends notes to backend LangGraph AI router.
+ * Throws on any failure — callers must show an error state, never invented output.
+ * `structured` is null when the model's reply isn't parseable JSON; use `raw` then.
  */
 export const askAI = async (notes) => {
-  try {
-    const response = await api.post("/interaction/ai", { notes });
-    const rawData = response.data?.data || "";
-    const parsed = parseAIStructuredOutput(rawData);
-
-    return {
-      success: true,
-      raw: rawData,
-      structured: parsed || {
-        "Doctor Name": "Healthcare Professional",
-        "Hospital": "Hospital / Clinic",
-        "Products Discussed": ["CardioPlus 50mg"],
-        "Summary": rawData,
-        "Sentiment": "Positive",
-        "Follow-up Action": "Schedule next routine visit",
-      },
-    };
-  } catch (error) {
-    console.error("AI API Error, fallback applied:", error);
-    // Intelligent fallback in case backend is offline
-    return {
-      success: false,
-      isFallback: true,
-      error: error.message,
-      raw: notes,
-      structured: {
-        "Doctor Name": "Dr. Rahul Sharma",
-        "Hospital": "Apollo Hospital",
-        "Products Discussed": ["CardioPlus 50mg"],
-        "Summary": `Logged notes: "${notes.slice(0, 180)}..."`,
-        "Sentiment": "Positive",
-        "Follow-up Action": "Follow up in 7 days with requested samples and trial literature.",
-      },
-    };
+  const response = await api.post("/interaction/ai", { notes });
+  const raw = response.data?.data;
+  if (typeof raw !== "string" || !raw.trim()) {
+    throw new Error("AI service returned an empty response");
   }
+  const parsed = parseAIStructuredOutput(raw);
+  const structured =
+    parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+  return { raw, structured };
 };
 
 /**

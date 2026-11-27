@@ -1,16 +1,37 @@
-import os
+from functools import lru_cache
 
-from dotenv import load_dotenv
+from groq import Groq
 from langchain_groq import ChatGroq
 
-load_dotenv(override=True)
+from app.core import config
 
-model_name = os.getenv("MODEL_NAME") or "qwen/qwen3.8-27b"
-if model_name in ["llama-3.3-70b-versatile", "gemma2-9b-it", "llama-3.1-8b-instant"]:
-    model_name = "qwen/qwen3.8-27b"
 
-llm = ChatGroq(
-    api_key=os.getenv("GROQ_API_KEY"),
-    model=model_name,
-    temperature=0.2,
-)
+class LLMNotConfigured(RuntimeError):
+    pass
+
+
+@lru_cache(maxsize=1)
+def get_llm() -> ChatGroq:
+    """Build the client on first use so a missing GROQ_API_KEY never breaks app import."""
+    if not config.GROQ_API_KEY:
+        raise LLMNotConfigured("GROQ_API_KEY is not set")
+    return ChatGroq(
+        api_key=config.GROQ_API_KEY,
+        model=config.MODEL_NAME,
+        temperature=0.2,
+        timeout=25,
+        max_retries=1,
+    )
+
+
+def check_llm() -> str:
+    """Verify the key and model with Groq's models endpoint (no tokens spent). Never raises."""
+    if not config.GROQ_API_KEY:
+        return "error: GROQ_API_KEY is not set"
+    try:
+        Groq(api_key=config.GROQ_API_KEY, timeout=5.0, max_retries=0).models.retrieve(
+            config.MODEL_NAME
+        )
+        return f"ok ({config.MODEL_NAME})"
+    except Exception as exc:
+        return f"error: {type(exc).__name__} for model {config.MODEL_NAME}: {str(exc).splitlines()[0][:200]}"

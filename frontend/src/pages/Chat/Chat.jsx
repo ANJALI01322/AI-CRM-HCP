@@ -38,13 +38,8 @@ export default function Chat() {
     {
       id: "msg-1",
       sender: "ai",
-      type: "analyst_brief",
-      signal: "Territory Relationship Velocity Alert",
-      confidence: "98%",
-      evidence: "3 high-value prescribers require immediate attention: Dr. Priya Mehta (18-day touch gap, pricing objection), Dr. Rahul Sharma (15 starter packs requested), and Dr. Rajesh Kulkarni (AIIMS P&T milestone on July 20).",
-      interpretation: "Active intervention this week will protect ₹45L+ in quarterly prescribing volume across Delhi NCR.",
-      recommendation: "Review the prioritized Next Best Actions queue or request specific clinical trial briefing dossiers.",
-      text: "OmniHealth Clinical Intelligence OS Analyst initialized.\n\nI can generate evidence-backed clinical trial briefings, analyze physician objections, draft follow-up communication dossiers, and identify territory prescribing risks.",
+      type: "text",
+      text: "Ask for clinical talking points, doctor background, objection handling, or territory priorities.",
       time: "Just now",
     },
   ]);
@@ -57,46 +52,63 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const handleSendMessage = async (textToSend) => {
-    const query = textToSend || inputText;
-    if (!query.trim() || isLoading) return;
+  const nowTime = () =>
+    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-    const userMsg = {
-      id: `user-${Date.now()}`,
-      sender: "user",
-      text: query,
-      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
-    setInputText("");
+  const requestAI = async (query) => {
     setIsLoading(true);
-
     try {
-      const response = await askAI(query);
-      const structured = response.structured;
-
-      const aiMsg = {
-        id: `ai-${Date.now()}`,
-        sender: "ai",
-        type: structured ? "structured_insight" : "text",
-        signal: structured?.["Doctor Name"] ? `Physician Intelligence: ${structured["Doctor Name"]}` : "Clinical Strategy Dossier",
-        confidence: "98%",
-        evidence: structured?.Summary || response.raw || "Clinical analysis synthesized from territory trial data and past interactions.",
-        interpretation: structured?.Sentiment ? `Detected Physician Sentiment: ${structured.Sentiment}. Engagement velocity requires targeted clinical evidence.` : "Recommended strategic clinical focus for upcoming detailing sessions.",
-        recommendation: structured?.["Follow-up Action"] || "Execute recommended detailing follow-up and log outcomes into CRM.",
-        structured,
-        text: response.raw || structured?.Summary || "I have analyzed your request against the territory clinical dataset.",
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-
+      const { raw, structured } = await askAI(query);
+      const aiMsg = structured
+        ? {
+            id: `ai-${Date.now()}`,
+            sender: "ai",
+            type: "structured_insight",
+            signal: structured["Doctor Name"]
+              ? `Physician Intelligence: ${structured["Doctor Name"]}`
+              : "AI Response",
+            evidence: structured.Summary || null,
+            interpretation: structured.Sentiment ? `Sentiment: ${structured.Sentiment}` : null,
+            recommendation: structured["Follow-up Action"] || null,
+            text: raw,
+            time: nowTime(),
+          }
+        : { id: `ai-${Date.now()}`, sender: "ai", type: "text", text: raw, time: nowTime() };
       setMessages((prev) => [...prev, aiMsg]);
     } catch (err) {
-      console.error(err);
-      toast.error("Clinical intelligence query failed.");
+      console.error("AI request failed:", err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          sender: "ai",
+          type: "error",
+          query,
+          text: err?.response?.data?.detail || err?.message || "Request failed",
+          time: nowTime(),
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSendMessage = (textToSend) => {
+    const query = textToSend || inputText;
+    if (!query.trim() || isLoading) return;
+
+    setMessages((prev) => [
+      ...prev,
+      { id: `user-${Date.now()}`, sender: "user", text: query, time: nowTime() },
+    ]);
+    setInputText("");
+    requestAI(query);
+  };
+
+  const handleRetry = (errorMsg) => {
+    if (isLoading) return;
+    setMessages((prev) => prev.filter((m) => m.id !== errorMsg.id));
+    requestAI(errorMsg.query);
   };
 
   const handleCopyMessage = (text) => {
@@ -186,6 +198,36 @@ export default function Chat() {
                     {msg.text}
                   </div>
                 </div>
+              ) : msg.type === "error" ? (
+                <div
+                  role="alert"
+                  className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3"
+                >
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <p className="font-bold text-rose-800 text-sm">AI service unavailable</p>
+                    <p className="text-xs text-rose-700 wrap-break-word">{msg.text}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    icon={RotateCcw}
+                    onClick={() => handleRetry(msg)}
+                    disabled={isLoading}
+                    className="shrink-0 cursor-pointer"
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : msg.type === "text" ? (
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-teal-50 border border-teal-200/70 text-teal-700 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="bg-white border border-slate-200/90 rounded-2xl rounded-tl-none p-4 leading-relaxed text-sm text-slate-800 whitespace-pre-wrap wrap-break-word card-shadow">
+                    {msg.text}
+                  </div>
+                </div>
               ) : (
                 /* STRUCTURED INTELLIGENCE LAYER CARD */
                 <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 card-shadow space-y-4">
@@ -204,10 +246,6 @@ export default function Chat() {
                         </h4>
                       </div>
                     </div>
-
-                    <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-md bg-teal-50 text-teal-700 border border-teal-200">
-                      {msg.confidence || "98%"} Confidence
-                    </span>
                   </div>
 
                   {/* Evidence & Interpretation Block */}
@@ -242,6 +280,12 @@ export default function Chat() {
                         {msg.recommendation}
                       </p>
                     </div>
+                  )}
+
+                  {!msg.evidence && !msg.interpretation && !msg.recommendation && (
+                    <p className="text-slate-800 leading-relaxed text-xs sm:text-sm whitespace-pre-wrap wrap-break-word">
+                      {msg.text}
+                    </p>
                   )}
 
                   {/* Action Footer */}

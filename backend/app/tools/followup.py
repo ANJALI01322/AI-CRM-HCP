@@ -1,4 +1,4 @@
-from app.agents.crm_agent import llm
+from app.agents.crm_agent import get_llm
 
 def followup(notes: str):
 
@@ -24,6 +24,6 @@ Probability of Conversion
 Return JSON.
 """
 
-    response = llm.invoke(prompt)
+    response = get_llm().invoke(prompt)
 
     return response.content

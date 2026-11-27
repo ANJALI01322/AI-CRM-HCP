@@ -66,12 +66,17 @@ pip install -r requirements.txt
 python -m uvicorn app.main:app --reload
 ```
 
+Create `backend/.env` with `GROQ_API_KEY` and `DATABASE_URL` (optional: `MODEL_NAME`, `ALLOWED_ORIGINS`).
+All routes are served under `/api`. In dev, Vite proxies `/api` to `http://localhost:8000`.
+
+Check configuration at `/api/health` — it returns `{status, db, llm}` and HTTP 503 if anything is misconfigured.
+
 ## API Documentation
 
 Open:
 
 ```
-http://127.0.0.1:8000/docs
+http://localhost:8000/api/docs
 ```
 
 ## Future Improvements

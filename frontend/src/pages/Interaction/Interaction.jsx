@@ -39,6 +39,7 @@ export default function Interaction() {
 
   const [filterSentiment, setFilterSentiment] = useState("All");
   const [searchHistory, setSearchHistory] = useState("");
+  const [aiError, setAiError] = useState(null);
 
   const handleGenerateAI = async () => {
     if (!draft.rawNotes?.trim()) {
@@ -46,6 +47,8 @@ export default function Interaction() {
       return;
     }
 
+    setAiError(null);
+    dispatch(setCurrentAIResult(null));
     dispatch(setIsGeneratingAI(true));
 
     const promptText = `Doctor Name: ${draft.doctorName || "Unknown"}
@@ -57,31 +60,27 @@ ${draft.rawNotes}`;
     try {
       const result = await askAI(promptText);
       dispatch(setCurrentAIResult(result));
-      if (result.success) {
-        toast.success("AI Summary & Sentiment Extracted!");
-      } else {
-        toast("AI processed in offline resilience mode.", { icon: "ℹ️" });
-      }
     } catch (err) {
-      console.error(err);
-      toast.error("Failed to generate AI response.");
+      console.error("AI request failed:", err);
+      setAiError(err?.response?.data?.detail || err?.message || "Request failed");
     } finally {
       dispatch(setIsGeneratingAI(false));
     }
   };
 
   const handleSaveToCRM = () => {
-    const structured = currentAIResult?.structured;
-    if (!structured) {
+    if (!currentAIResult?.raw) {
       toast.error("No AI result to save.");
       return;
     }
+    // Unstructured replies are saved as the summary; nothing is invented for missing fields.
+    const structured = currentAIResult.structured || {};
 
     const doctorName =
-      structured["Doctor Name"] || draft.doctorName || "Dr. Rahul Sharma";
+      structured["Doctor Name"] || draft.doctorName || "Unknown HCP";
     const hospital =
-      structured["Hospital"] || draft.hospital || "Apollo Hospital";
-    const sentiment = structured["Sentiment"] || "Positive";
+      structured["Hospital"] || draft.hospital || "Not specified";
+    const sentiment = structured["Sentiment"] || "Neutral";
     const followUpAction = structured["Follow-up Action"] || "";
 
     const newRecord = {
@@ -97,10 +96,9 @@ ${draft.rawNotes}`;
         doctorName,
         hospital,
         productsDiscussed: structured["Products Discussed"] || draft.products,
-        summary: structured["Summary"] || draft.rawNotes,
+        summary: structured["Summary"] || currentAIResult.raw,
         sentiment,
         followUpAction,
-        confidenceScore: "98%",
       },
       sentiment,
       followUpDate: draft.followUpDate || "2026-07-21",
@@ -224,6 +222,8 @@ ${draft.rawNotes}`;
         <AISummaryCard
           aiResult={currentAIResult}
           isLoading={isGeneratingAI}
+          error={aiError}
+          onRetry={handleGenerateAI}
           onSaveInteraction={handleSaveToCRM}
         />
       </div>
